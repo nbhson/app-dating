@@ -104,7 +104,7 @@ src/
     ProfileClient.tsx       # Sửa ảnh/voice/prompts/dailyAnswer/intent + extended (height/languages/religion/wantKids/smoking/drinking) + incognito + stamps + verification + danger zone (admin disabled) + popup
     LandingClient.tsx       # Hero "Tình cảm viết chậm" + 3 bước
     Nav.tsx                 # Sidebar editorial (desktop) + pill đen (mobile) + admin distinct section (amber vs dark) + notifications popup + badges
-    AdminClient.tsx         # 10 tabs: overview/users/reports/questions/moderation/verification/analytics/announcements/config/audit + i18n + popup
+    AdminClient.tsx         # 10 tabs + pending notifications: overview (banner cần xử lý + badge tổng), users/reports/questions/moderation/verification/analytics/announcements/config/audit + badges số lượng (verification/reports/moderation) + poll 30s + i18n + popup
     ui/PopupProvider.tsx    # Toast (glass-strong, auto 3s) + Modal (confirm/prompt/alert) — thay toàn bộ native alert
     Providers.tsx           # SessionProvider → I18nProvider → PopupProvider
   lib/
@@ -174,7 +174,7 @@ VerificationRequest { userId, photoUrl, status(PENDING|APPROVED|REJECTED), note,
 
 | Nhóm | Chi tiết |
 |------|----------|
-| **Auth** | Google / Apple OAuth (Auth.js) + Credentials demo — nhập bất kỳ email là tạo ngay (`demo@lumen.app`). Admin auto-promote `nbhson43@gmail.com`. |
+| **Auth** | Google / Apple OAuth (Auth.js) + Credentials demo — nhập bất kỳ email là tạo ngay (`demo@lumen.app`). Admin duy nhất `nbhson` (`nbhson43@gmail.com`) auto-promote qua `ADMIN_EMAIL` trong `src/lib/auth.ts` + `prisma/seed.ts`. |
 | **Onboarding 5 bước** | 1) Basic (tên, dob, gender, bio) → 2) Preferences (quan tâm + **intent** + tuổi + khoảng cách) → 3) **Prompts** (1–3 câu) → 4) **Photos 1–6 + Voice 15s** → 5) Preview. Toast thay alert. |
 | **Discovery editorial** | Không swipe. Ảnh blur 18px, bấm “Mở bưu thiếp” mới rõ. Hiển thị bio, occupation/education, **dailyAnswer**, **compatibility**, **verified ✓**, prompts, interests anchor. Nút `↩ Undo` (5 phút), `♡ Lưu` (favorite), `✦ Tem ưu tiên` (tốn 1 stamp). |
 | **Like = bưu thiếp kèm lời** | `POST /api/discover/like` bắt buộc `comment 6–140` + `anchor` + `isPriority` (trừ stamps). Tạo `Like` + nếu mutual → `Match` + 2 intro `Message` + `Notification` cho cả hai. |
@@ -187,7 +187,7 @@ VerificationRequest { userId, photoUrl, status(PENDING|APPROVED|REJECTED), note,
 | **Safety** | Report 6 lý do + Block (xóa khỏi discovery, chặn chat, xóa match). Admin xử lý `PENDING → RESOLVED/DISMISSED` + auto suspend. |
 | **Profile** | Sửa ảnh/voice/prompts/dailyAnswer/intent + **extended** (height/languages/religion/wantKids/smoking/drinking) + `isIncognito` + **stamps** + **verification** (gửi ảnh → tick xanh). `Advanced filters` (verifiedOnly/hasVoice/hasPhoto). **Admin không xóa được** — nút disabled + banner amber + API `403 ADMIN_CANNOT_DELETE`. |
 | **Admin distinct menu** | `Nav.tsx` tách `adminItem` khỏi `items` user: desktop là section riêng `QUẢN TRỊ VIÊN · ADMIN` với divider, card `amber-50` (inactive) / `bg-[#1A1A1E]` (active) + badge `ADMIN`; mobile là pill nổi amber riêng trên pill chính. Không lẫn với Hòm thư/Hồ sơ. |
-| **Admin 10 tabs** | `overview` stats + `users` search/pagination + `reports` workflow + `questions` CRUD + `moderation` (photos/prompts/verification) + `verification` + `analytics` (7 ngày + conversion) + `announcements` broadcast + `config` (DAILY_LIMIT/SLOW_LIMIT) + `audit` log. Full vi/en + popup confirm/prompt/toast. |
+| **Admin 10 tabs + notifications** | `overview` stats + banner `Cần xử lý` (verification/reports/moderation breakdown) + badges số lượng trên tabs/sub-tabs + poll 30s + `users` search/pagination + `reports` workflow + `questions` CRUD + `moderation` (photos/prompts/verification) + `verification` + `analytics` (7 ngày + conversion) + `announcements` broadcast + `config` (DAILY_LIMIT/SLOW_LIMIT) + `audit` log. `GET /api/admin/stats` trả `pendingCounts`. Full vi/en + popup confirm/prompt/toast. Admin duy nhất `nbhson`. |
 | **Popup thay alert** | `ui/PopupProvider.tsx` — `toast` (glass-strong, 3s) và `confirm`/`prompt`/`showAlert` (backdrop blur, card `rounded-[28px]`). Đã thay 27 chỗ `alert/confirm/prompt` native. |
 | **Privacy/Terms/Guidelines/Account-deletion** | `h-[100dvh] overflow-y-auto overscroll-contain no-scrollbar` (fix không scroll do `body overflow-hidden`), `glass-strong rounded-[28px]`, 10 sections privacy + 9 terms + 5 guidelines + 3 bước xóa, full vi/en qua `dictionaries.ts`. |
 | **i18n** | `dictionaries.ts` 700+ keys vi/en cho `common/nav/notifications/discover/profile/matches/chat/onboarding/intent/admin/privacy/terms/guidelines`. `I18nProvider` cookie `NEXT_LOCALE`. |
@@ -221,7 +221,7 @@ VerificationRequest { userId, photoUrl, status(PENDING|APPROVED|REJECTED), note,
 | `GET/POST` | `/api/daily-answer` | `{answer}` |
 | `GET` | `/api/usage/today` | `{viewed, limit}` |
 | `POST` | `/api/users/:id/block` `/report` |  |
-| `GET` | `/api/admin/stats` | Tổng quan |
+| `GET` | `/api/admin/stats` | Tổng quan + `pendingCounts` (verification/reports/photos/prompts/moderation/total) |
 | `GET` | `/api/admin/users?q=&status=&page=` | Search + pagination |
 | `GET/PATCH` | `/api/admin/reports` | Workflow |
 | `GET/POST/DELETE` | `/api/admin/daily-questions` | CRUD |
@@ -267,7 +267,7 @@ npm run dev  # http://localhost:3000
 
 **Demo không OAuth:** Nhập bất kỳ email ở landing (vd `demo1@lumen.app` khi SEED_DEMO=1).
 
-**Admin:** `nbhson43@gmail.com` / `Lumen123!`. Seed tự tạo/nâng quyền `nbhson43@gmail.com` làm admin và hạ quyền email cũ `admin@admin.admin`. Muốn đặt admin khác: `npx prisma studio` hoặc `UPDATE User SET isAdmin=1 WHERE email='you@...';`
+**Admin:** `nbhson` (`nbhson43@gmail.com`) / `Lumen123!`. Seed tự tạo/nâng quyền `nbhson43@gmail.com` làm admin (name=`nbhson`) và hạ quyền email cũ `admin@admin.admin`. `ADMIN_EMAIL` được định nghĩa tại `src/lib/auth.ts:9` và `prisma/seed.ts:51`. Muốn đặt admin khác: `npx prisma studio` hoặc `UPDATE User SET isAdmin=1 WHERE email='you@...';`
 
 ### Env
 

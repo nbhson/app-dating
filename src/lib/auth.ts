@@ -6,7 +6,8 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "./prisma";
 import bcrypt from "bcryptjs";
 
-export const ADMIN_EMAIL = "nbhson43@gmail.com";
+export const ADMIN_EMAIL = "nbhson43@gmail.com"; // nbhson - primary admin
+export const ADMIN_NAME = "nbhson";
 const LEGACY_ADMIN_EMAIL = "admin@admin.admin";
 const ADMIN_EMAILS = new Set([ADMIN_EMAIL.toLowerCase()]);
 function isAdminEmail(email: string | null | undefined): boolean {

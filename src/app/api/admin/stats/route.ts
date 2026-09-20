@@ -21,6 +21,13 @@ export async function GET() {
   ]);
   const discoveryToday = await prisma.dailyUsage.aggregate({ _sum: { profilesViewed: true }, where: { date } });
 
+  const [pendingVerification, pendingReports, pendingPhotos, pendingPrompts] = await Promise.all([
+    prisma.verificationRequest.count({ where: { status: "PENDING" } }),
+    prisma.report.count({ where: { status: "PENDING" } }),
+    prisma.profilePhoto.count({ where: { status: "PENDING" } }),
+    prisma.promptAnswer.count({ where: { status: "PENDING" } }),
+  ]);
+
   const reports = await prisma.report.findMany({ take: 20, orderBy: { createdAt: "desc" }, include: { reporter: true, reported: true } });
   const users = await prisma.user.findMany({ take: 20, orderBy: { createdAt: "desc" }, include: { profile: true, photos: { orderBy: { position: "asc" } } } });
 
@@ -34,6 +41,14 @@ export async function GET() {
     discoveryToday: discoveryToday._sum.profilesViewed ?? 0,
     recentReports: reports,
     recentUsers: users,
+    pendingCounts: {
+      verification: pendingVerification,
+      reports: pendingReports,
+      photos: pendingPhotos,
+      prompts: pendingPrompts,
+      moderation: pendingPhotos + pendingPrompts + pendingVerification,
+      total: pendingVerification + pendingReports + pendingPhotos + pendingPrompts,
+    },
   });
 }
 

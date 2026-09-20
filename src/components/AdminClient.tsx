@@ -61,9 +61,23 @@ export default function AdminClient({ isAdmin }: { isAdmin: boolean }) {
   // verification
   const [verifs, setVerifs] = useState<any[]>([]);
 
+  // pending counts for notifications
+  const [pendingCounts, setPendingCounts] = useState<{ verification: number; reports: number; photos: number; prompts: number; moderation: number; total: number } | null>(null);
+
+  const refreshPending = async () => {
+    try {
+      const r = await fetch("/api/admin/stats").then((x) => x.json());
+      if (r.pendingCounts) setPendingCounts(r.pendingCounts);
+      // also keep data in sync if overview is visible
+      setData((prev: any) => prev ? { ...prev, pendingCounts: r.pendingCounts } : r);
+    } catch {}
+  };
+
   useEffect(() => {
     if (!isAdmin) { setLoading(false); return; }
-    fetch("/api/admin/stats").then((r) => r.json()).then((d) => { setData(d); setLoading(false); });
+    fetch("/api/admin/stats").then((r) => r.json()).then((d) => { setData(d); setPendingCounts(d.pendingCounts ?? null); setLoading(false); });
+    const id = setInterval(refreshPending, 30000);
+    return () => clearInterval(id);
   }, [isAdmin]);
 
   useEffect(()=>{
@@ -77,6 +91,8 @@ export default function AdminClient({ isAdmin }: { isAdmin: boolean }) {
     if(tab==="announcements") fetch("/api/admin/announcements").then(r=>r.json()).then(d=> setAnnouncements(d.announcements??[]));
     if(tab==="audit") fetch("/api/admin/audit").then(r=>r.json()).then(d=> setAudit(d.actions??[]));
     if(tab==="verification") fetch("/api/admin/verification?status=PENDING").then(r=>r.json()).then(d=> setVerifs(d.requests??[]));
+    // refresh pending counts whenever tab changes (cheap)
+    refreshPending();
   },[tab, isAdmin, usersQ, usersStatus, usersPage, reportsStatus, modType]);
 
   const statusLabel = (s?: string) => (s && (t.admin as any)?.status?.[s]) ? (t.admin as any).status[s] : s ?? "—";
@@ -137,8 +153,8 @@ export default function AdminClient({ isAdmin }: { isAdmin: boolean }) {
       </div>
     );
   }
-
   const s = (t.admin as any).stats;
+
   const stats: [string, number][] = [
     [s.totalUsers, data.totalUsers],
     [s.activeUsers, data.activeUsers],
@@ -150,6 +166,13 @@ export default function AdminClient({ isAdmin }: { isAdmin: boolean }) {
   ];
 
   const atabs = (t.admin as any).tabs;
+  const getTabBadge = (k: Tab): number => {
+    if (!pendingCounts) return 0;
+    if (k === "verification") return pendingCounts.verification;
+    if (k === "reports") return pendingCounts.reports;
+    if (k === "moderation") return pendingCounts.moderation;
+    return 0;
+  };
   const tabs: [Tab,string][] = [
     ["overview", atabs.overview],
     ["users", atabs.users],
@@ -170,18 +193,68 @@ export default function AdminClient({ isAdmin }: { isAdmin: boolean }) {
         <main className="flex-1 min-w-0 overflow-hidden p-4 sm:p-6 md:p-6 lg:p-8">
           <div className="h-full min-h-0 max-w-[1200px] mx-auto w-full rounded-[24px] md:rounded-[28px] glass-strong border border-white/70 p-4 sm:p-5 md:p-6 lg:p-7 shadow-[0_12px_40px_rgba(46,26,34,0.08)] overflow-hidden flex flex-col gap-3 md:gap-5">
             <div className="shrink-0 flex flex-wrap items-center justify-between gap-3">
-              <h1 className="font-display text-[22px] md:text-[28px] font-medium text-[#2E1A22]">{(t.admin as any).title}</h1>
-              <span className="text-[11px] md:text-xs font-mono text-[#B08A95] bg-[#FFF0F3] border border-[#FCE8EC] rounded-full px-2.5 md:px-3 py-1">{(t.admin as any).moderationBadge}</span>
+              <h1 className="font-display text-[22px] md:text-[28px] font-medium text-[#2E1A22] flex items-center gap-2">
+                {(t.admin as any).title}
+                {pendingCounts && pendingCounts.total > 0 && (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-mono bg-amber-500 text-white rounded-full px-2.5 py-1 animate-pulse">
+                    <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+                    {pendingCounts.total} cần xử lý
+                  </span>
+                )}
+                {pendingCounts && pendingCounts.total === 0 && (
+                  <span className="inline-flex items-center text-[11px] font-mono bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-2.5 py-1">✓ Đã xong</span>
+                )}
+              </h1>
+              <div className="flex items-center gap-2">
+                <button onClick={refreshPending} title="Làm mới" className="w-8 h-8 grid place-items-center rounded-full bg-white border border-[#FCE8EC] hover:bg-[#FFF0F3] text-[#8E6B75] text-xs">↻</button>
+                <span className="text-[11px] md:text-xs font-mono text-[#B08A95] bg-[#FFF0F3] border border-[#FCE8EC] rounded-full px-2.5 md:px-3 py-1">{(t.admin as any).moderationBadge}</span>
+              </div>
             </div>
 
             <div className="shrink-0 flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
-              {tabs.map(([k,label])=>(
-                <button key={k} onClick={()=>setTab(k)} className={`px-3.5 py-2 rounded-full text-xs font-semibold whitespace-nowrap border transition ${tab===k ? "bg-[#2E1A22] text-white border-[#2E1A22]" : "bg-white border-[#FCE8EC] text-[#8E6B75] hover:border-[#FFD6DE]"}`}>{label}</button>
-              ))}
+              {tabs.map(([k,label])=>{
+                const badge = getTabBadge(k);
+                return (
+                  <button key={k} onClick={()=>setTab(k)} className={`relative px-3.5 py-2 rounded-full text-xs font-semibold whitespace-nowrap border transition flex items-center gap-1.5 ${tab===k ? "bg-[#2E1A22] text-white border-[#2E1A22]" : "bg-white border-[#FCE8EC] text-[#8E6B75] hover:border-[#FFD6DE]"}`}>
+                    <span>{label}</span>
+                    {badge > 0 && (
+                      <span className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[11px] font-bold leading-none ${tab===k ? "bg-[#FF4D6D] text-white" : "bg-red-500 text-white"}`}>{badge > 99 ? "99+" : badge}</span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
 
             {tab==="overview" && (
               <>
+                {pendingCounts && pendingCounts.total > 0 && (
+                  <div className="shrink-0 rounded-[18px] border border-amber-200 bg-gradient-to-br from-amber-50 to-[#FFF0F3] p-3.5 md:p-4 shadow-[0_4px_16px_rgba(46,26,34,0.05)]">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-sm font-semibold text-[#2E1A22] flex items-center gap-2">🔔 Cần xử lý <span className="bg-red-500 text-white text-xs font-bold rounded-full px-2 py-0.5">{pendingCounts.total}</span></h3>
+                      <button onClick={refreshPending} className="text-xs text-[#8E6B75] underline hover:text-[#2E1A22]">Làm mới</button>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                      <button onClick={()=>setTab("verification")} className="flex items-center justify-between rounded-2xl border bg-white border-[#FCE8EC] p-3 hover:border-[#FF4D6D]/40 hover:shadow-sm transition text-left">
+                        <div><div className="text-xs text-[#8E6B75]">Yêu cầu xác minh</div><div className="text-lg font-bold text-[#2E1A22]">{pendingCounts.verification}</div></div>
+                        <span className={`w-8 h-8 grid place-items-center rounded-full text-xs font-bold ${pendingCounts.verification>0 ? "bg-amber-500 text-white" : "bg-emerald-50 text-emerald-600 border border-emerald-200"}`}>{pendingCounts.verification>0 ? "!" : "✓"}</span>
+                      </button>
+                      <button onClick={()=>setTab("reports")} className="flex items-center justify-between rounded-2xl border bg-white border-[#FCE8EC] p-3 hover:border-[#FF4D6D]/40 hover:shadow-sm transition text-left">
+                        <div><div className="text-xs text-[#8E6B75]">Báo cáo</div><div className="text-lg font-bold text-[#2E1A22]">{pendingCounts.reports}</div></div>
+                        <span className={`w-8 h-8 grid place-items-center rounded-full text-xs font-bold ${pendingCounts.reports>0 ? "bg-red-500 text-white" : "bg-emerald-50 text-emerald-600 border border-emerald-200"}`}>{pendingCounts.reports>0 ? "!" : "✓"}</span>
+                      </button>
+                      <button onClick={()=>setTab("moderation")} className="flex items-center justify-between rounded-2xl border bg-white border-[#FCE8EC] p-3 hover:border-[#FF4D6D]/40 hover:shadow-sm transition text-left">
+                        <div><div className="text-xs text-[#8E6B75]">Kiểm duyệt</div><div className="text-lg font-bold text-[#2E1A22]">{pendingCounts.moderation}</div><div className="text-[11px] font-mono text-[#B08A95]">Ảnh {pendingCounts.photos} · Prompt {pendingCounts.prompts} · Xác minh {pendingCounts.verification}</div></div>
+                        <span className={`w-8 h-8 grid place-items-center rounded-full text-xs font-bold shrink-0 ml-2 ${pendingCounts.moderation>0 ? "bg-[#FF4D6D] text-white" : "bg-emerald-50 text-emerald-600 border border-emerald-200"}`}>{pendingCounts.moderation>0 ? "!" : "✓"}</span>
+                      </button>
+                      <div className="flex flex-col justify-center rounded-2xl border bg-white/60 border-dashed border-[#FCE8EC] p-3">
+                        <div className="text-xs text-[#8E6B75]">Tổng chờ xử lý</div><div className="text-lg font-bold text-[#2E1A22]">{pendingCounts.total}</div><div className="text-[11px] text-[#B08A95]">Cập nhật 30s/lần</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {pendingCounts && pendingCounts.total === 0 && (
+                  <div className="shrink-0 rounded-[18px] border border-emerald-200 bg-emerald-50/60 p-3 text-center text-sm text-emerald-700 font-medium">✨ Tất cả đã xử lý — không có mục nào đang chờ!</div>
+                )}
                 <div className="shrink-0 grid grid-cols-2 md:grid-cols-4 gap-2.5 md:gap-4">
                   {stats.map(([label, v]) => (
                     <div key={label} className="rounded-[18px] md:rounded-[20px] border border-[#FCE8EC] bg-white/85 p-3 md:p-4 shadow-[0_4px_16px_rgba(46,26,34,0.05)]">
@@ -271,9 +344,9 @@ export default function AdminClient({ isAdmin }: { isAdmin: boolean }) {
                       {r.details && <div className="text-sm mt-1">{r.details}</div>}
                       {r.status==="PENDING" && (
                         <div className="flex gap-2 mt-2">
-                          <button onClick={async()=>{ await fetch("/api/admin/reports",{method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify({reportId:r.id, status:"RESOLVED", actionTaken:"SUSPEND", resolutionNote:"Vi phạm"})}); setReports(prev=>prev.filter(x=>x.id!==r.id)); }} className="px-3 py-1.5 rounded-full bg-red-500 text-white text-xs">Giải quyết + khóa</button>
-                          <button onClick={async()=>{ await fetch("/api/admin/reports",{method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify({reportId:r.id, status:"RESOLVED"})}); setReports(prev=>prev.filter(x=>x.id!==r.id)); }} className="px-3 py-1.5 rounded-full bg-emerald-600 text-white text-xs">Đã xử lý</button>
-                          <button onClick={async()=>{ await fetch("/api/admin/reports",{method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify({reportId:r.id, status:"DISMISSED"})}); setReports(prev=>prev.filter(x=>x.id!==r.id)); }} className="px-3 py-1.5 rounded-full bg-white border text-xs">Bỏ qua</button>
+                          <button onClick={async()=>{ await fetch("/api/admin/reports",{method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify({reportId:r.id, status:"RESOLVED", actionTaken:"SUSPEND", resolutionNote:"Vi phạm"})}); setReports(prev=>prev.filter(x=>x.id!==r.id)); setPendingCounts(p=> p ? {...p, reports: Math.max(0,p.reports-1), total: Math.max(0,p.total-1)} : p); }} className="px-3 py-1.5 rounded-full bg-red-500 text-white text-xs">Giải quyết + khóa</button>
+                          <button onClick={async()=>{ await fetch("/api/admin/reports",{method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify({reportId:r.id, status:"RESOLVED"})}); setReports(prev=>prev.filter(x=>x.id!==r.id)); setPendingCounts(p=> p ? {...p, reports: Math.max(0,p.reports-1), total: Math.max(0,p.total-1)} : p); }} className="px-3 py-1.5 rounded-full bg-emerald-600 text-white text-xs">Đã xử lý</button>
+                          <button onClick={async()=>{ await fetch("/api/admin/reports",{method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify({reportId:r.id, status:"DISMISSED"})}); setReports(prev=>prev.filter(x=>x.id!==r.id)); setPendingCounts(p=> p ? {...p, reports: Math.max(0,p.reports-1), total: Math.max(0,p.total-1)} : p); }} className="px-3 py-1.5 rounded-full bg-white border text-xs">Bỏ qua</button>
                         </div>
                       )}
                     </div>
@@ -309,11 +382,11 @@ export default function AdminClient({ isAdmin }: { isAdmin: boolean }) {
               <div className="flex-1 min-h-0 flex flex-col gap-3 overflow-hidden">
                 <div className="flex gap-2">
                   {[
-                    ["photos","Ảnh"],
-                    ["prompts","Prompt"],
-                    ["verification","Xác minh"],
-                  ].map(([k,l])=>(
-                    <button key={k} onClick={()=>setModType(k)} className={`px-4 py-2 rounded-full text-xs font-semibold border ${modType===k?"bg-[#2E1A22] text-white border-[#2E1A22]":"bg-white border-[#FCE8EC]"}`}>{l}</button>
+                    ["photos","Ảnh", pendingCounts?.photos ?? 0],
+                    ["prompts","Prompt", pendingCounts?.prompts ?? 0],
+                    ["verification","Xác minh", pendingCounts?.verification ?? 0],
+                  ].map(([k,l,c])=>(
+                    <button key={k as string} onClick={()=>setModType(k as string)} className={`px-4 py-2 rounded-full text-xs font-semibold border flex items-center gap-1.5 ${modType===k?"bg-[#2E1A22] text-white border-[#2E1A22]":"bg-white border-[#FCE8EC] text-[#8E6B75]"}`}>{l as string} {(c as number) > 0 && <span className={`min-w-[18px] h-[18px] px-1 grid place-items-center rounded-full text-[11px] font-bold ${modType===k ? "bg-white text-[#2E1A22]" : "bg-red-500 text-white"}`}>{c as number}</span>}</button>
                   ))}
                 </div>
                 <div className="flex-1 min-h-0 overflow-y-auto space-y-2 pr-1">
@@ -322,8 +395,8 @@ export default function AdminClient({ isAdmin }: { isAdmin: boolean }) {
                       <img src={p.url} alt="" className="w-16 h-20 rounded-xl object-cover border border-[#FCE8EC]" />
                       <div className="flex-1 min-w-0"><div className="text-xs text-[#B08A95]">{p.user?.email} · {fmtDate(p.createdAt)}</div><div className="text-xs mt-1">Trạng thái: {p.status}</div></div>
                       <div className="flex flex-col gap-1">
-                        <button onClick={async()=>{ await fetch("/api/admin/moderation",{method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({type:"photo", id:p.id, action:"APPROVE"})}); setModData((d:any)=>({...d, photos:d.photos.filter((x:any)=>x.id!==p.id)}));}} className="px-3 py-1 rounded-full bg-emerald-600 text-white text-xs">Duyệt</button>
-                        <button onClick={async()=>{ await fetch("/api/admin/moderation",{method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({type:"photo", id:p.id, action:"REJECT"})}); setModData((d:any)=>({...d, photos:d.photos.filter((x:any)=>x.id!==p.id)}));}} className="px-3 py-1 rounded-full bg-red-500 text-white text-xs">Từ chối</button>
+                        <button onClick={async()=>{ await fetch("/api/admin/moderation",{method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({type:"photo", id:p.id, action:"APPROVE"})}); setModData((d:any)=>({...d, photos:d.photos.filter((x:any)=>x.id!==p.id)})); setPendingCounts(pc=> pc ? {...pc, photos: Math.max(0,pc.photos-1), moderation: Math.max(0,pc.moderation-1), total: Math.max(0,pc.total-1)}:pc);}} className="px-3 py-1 rounded-full bg-emerald-600 text-white text-xs">Duyệt</button>
+                        <button onClick={async()=>{ await fetch("/api/admin/moderation",{method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({type:"photo", id:p.id, action:"REJECT"})}); setModData((d:any)=>({...d, photos:d.photos.filter((x:any)=>x.id!==p.id)})); setPendingCounts(pc=> pc ? {...pc, photos: Math.max(0,pc.photos-1), moderation: Math.max(0,pc.moderation-1), total: Math.max(0,pc.total-1)}:pc);}} className="px-3 py-1 rounded-full bg-red-500 text-white text-xs">Từ chối</button>
                       </div>
                     </div>
                   ))}
@@ -332,8 +405,8 @@ export default function AdminClient({ isAdmin }: { isAdmin: boolean }) {
                       <div className="text-xs text-[#B08A95]">{pa.user?.email} · {fmtDate(pa.createdAt)}</div>
                       <div className="text-[11px] font-mono text-[#FF4D6D] mt-1">{pa.question}</div><div className="text-sm mt-1">{pa.answer}</div>
                       <div className="flex gap-2 mt-2">
-                        <button onClick={async()=>{ await fetch("/api/admin/moderation",{method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({type:"prompt", id:pa.id, action:"APPROVE"})}); setModData((d:any)=>({...d, prompts:d.prompts.filter((x:any)=>x.id!==pa.id)}));}} className="px-3 py-1 rounded-full bg-emerald-600 text-white text-xs">Duyệt</button>
-                        <button onClick={async()=>{ await fetch("/api/admin/moderation",{method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({type:"prompt", id:pa.id, action:"REJECT"})}); setModData((d:any)=>({...d, prompts:d.prompts.filter((x:any)=>x.id!==pa.id)}));}} className="px-3 py-1 rounded-full bg-red-500 text-white text-xs">Xóa</button>
+                        <button onClick={async()=>{ await fetch("/api/admin/moderation",{method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({type:"prompt", id:pa.id, action:"APPROVE"})}); setModData((d:any)=>({...d, prompts:d.prompts.filter((x:any)=>x.id!==pa.id)})); setPendingCounts(pc=> pc ? {...pc, prompts: Math.max(0,pc.prompts-1), moderation: Math.max(0,pc.moderation-1), total: Math.max(0,pc.total-1)}:pc);}} className="px-3 py-1 rounded-full bg-emerald-600 text-white text-xs">Duyệt</button>
+                        <button onClick={async()=>{ await fetch("/api/admin/moderation",{method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({type:"prompt", id:pa.id, action:"REJECT"})}); setModData((d:any)=>({...d, prompts:d.prompts.filter((x:any)=>x.id!==pa.id)})); setPendingCounts(pc=> pc ? {...pc, prompts: Math.max(0,pc.prompts-1), moderation: Math.max(0,pc.moderation-1), total: Math.max(0,pc.total-1)}:pc);}} className="px-3 py-1 rounded-full bg-red-500 text-white text-xs">Xóa</button>
                       </div>
                     </div>
                   ))}
@@ -342,8 +415,8 @@ export default function AdminClient({ isAdmin }: { isAdmin: boolean }) {
                       <img src={v.photoUrl} alt="" className="w-20 h-20 rounded-xl object-cover border" />
                       <div className="flex-1"><div className="text-sm font-medium">{v.user?.email} · {v.user?.profile?.firstName}</div><div className="text-xs text-[#B08A95]">{fmtDate(v.createdAt)}</div></div>
                       <div className="flex flex-col gap-1">
-                        <button onClick={async()=>{ await fetch("/api/admin/moderation",{method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({type:"verification", id:v.id, action:"APPROVE"})}); setModData((d:any)=>({...d, verificationRequests:d.verificationRequests.filter((x:any)=>x.id!==v.id)}));}} className="px-3 py-1 rounded-full bg-emerald-600 text-white text-xs">Duyệt ✓</button>
-                        <button onClick={async()=>{ await fetch("/api/admin/moderation",{method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({type:"verification", id:v.id, action:"REJECT"})}); setModData((d:any)=>({...d, verificationRequests:d.verificationRequests.filter((x:any)=>x.id!==v.id)}));}} className="px-3 py-1 rounded-full bg-white border text-xs">Từ chối</button>
+                        <button onClick={async()=>{ await fetch("/api/admin/moderation",{method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({type:"verification", id:v.id, action:"APPROVE"})}); setModData((d:any)=>({...d, verificationRequests:d.verificationRequests.filter((x:any)=>x.id!==v.id)})); setPendingCounts(pc=> pc ? {...pc, verification: Math.max(0,pc.verification-1), moderation: Math.max(0,pc.moderation-1), total: Math.max(0,pc.total-1)}:pc);}} className="px-3 py-1 rounded-full bg-emerald-600 text-white text-xs">Duyệt ✓</button>
+                        <button onClick={async()=>{ await fetch("/api/admin/moderation",{method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({type:"verification", id:v.id, action:"REJECT"})}); setModData((d:any)=>({...d, verificationRequests:d.verificationRequests.filter((x:any)=>x.id!==v.id)})); setPendingCounts(pc=> pc ? {...pc, verification: Math.max(0,pc.verification-1), moderation: Math.max(0,pc.moderation-1), total: Math.max(0,pc.total-1)}:pc);}} className="px-3 py-1 rounded-full bg-white border text-xs">Từ chối</button>
                       </div>
                     </div>
                   ))}
@@ -359,8 +432,8 @@ export default function AdminClient({ isAdmin }: { isAdmin: boolean }) {
                     <img src={v.photoUrl} alt="" className="w-20 h-24 rounded-xl object-cover border" />
                     <div className="flex-1"><div className="font-medium text-sm">{v.user?.profile?.firstName} · {v.user?.email}</div><div className="text-xs text-[#B08A95]">{fmtDate(v.createdAt)}</div></div>
                     <div className="flex flex-col gap-2">
-                      <button onClick={async()=>{await fetch("/api/admin/verification",{method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({requestId:v.id, action:"APPROVE"})}); setVerifs(p=>p.filter(x=>x.id!==v.id));}} className="px-4 py-2 rounded-full bg-emerald-600 text-white text-xs">Duyệt</button>
-                      <button onClick={async()=>{await fetch("/api/admin/verification",{method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({requestId:v.id, action:"REJECT"})}); setVerifs(p=>p.filter(x=>x.id!==v.id));}} className="px-4 py-2 rounded-full bg-white border text-xs">Từ chối</button>
+                      <button onClick={async()=>{await fetch("/api/admin/verification",{method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({requestId:v.id, action:"APPROVE"})}); setVerifs(p=>p.filter(x=>x.id!==v.id)); setPendingCounts(pc=> pc ? {...pc, verification: Math.max(0,pc.verification-1), moderation: Math.max(0,pc.moderation-1), total: Math.max(0,pc.total-1)}:pc);}} className="px-4 py-2 rounded-full bg-emerald-600 text-white text-xs">Duyệt</button>
+                      <button onClick={async()=>{await fetch("/api/admin/verification",{method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({requestId:v.id, action:"REJECT"})}); setVerifs(p=>p.filter(x=>x.id!==v.id)); setPendingCounts(pc=> pc ? {...pc, verification: Math.max(0,pc.verification-1), moderation: Math.max(0,pc.moderation-1), total: Math.max(0,pc.total-1)}:pc);}} className="px-4 py-2 rounded-full bg-white border text-xs">Từ chối</button>
                     </div>
                   </div>
                 ))}

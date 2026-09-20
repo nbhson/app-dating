@@ -58,19 +58,19 @@ async function main() {
     let admin = await prisma.user.findUnique({ where: { email: ADMIN_EMAIL } });
     if (!admin) {
       admin = await prisma.user.create({
-        data: { email: ADMIN_EMAIL, name: "Admin Son", passwordHash: demoPasswordHash, status: "ACTIVE", isAdmin: true, lastActiveAt: new Date() },
+        data: { email: ADMIN_EMAIL, name: "nbhson", passwordHash: demoPasswordHash, status: "ACTIVE", isAdmin: true, lastActiveAt: new Date() },
       });
-      console.log(`Created admin ${ADMIN_EMAIL}`);
-    } else if (!admin.isAdmin || !admin.passwordHash) {
-      admin = await prisma.user.update({ where: { id: admin.id }, data: { isAdmin: true, passwordHash: admin.passwordHash ?? demoPasswordHash, status: "ACTIVE" } });
-      console.log(`Promoted ${ADMIN_EMAIL} to admin`);
+      console.log(`Created admin ${ADMIN_EMAIL} (nbhson)`);
+    } else if (!admin.isAdmin || !admin.passwordHash || admin.name !== "nbhson") {
+      admin = await prisma.user.update({ where: { id: admin.id }, data: { isAdmin: true, name: "nbhson", passwordHash: admin.passwordHash ?? demoPasswordHash, status: "ACTIVE" } });
+      console.log(`Promoted ${ADMIN_EMAIL} to admin (nbhson)`);
     }
     // ensure profile exists for admin so discover doesn't break
     const existingProfile = await prisma.profile.findUnique({ where: { userId: admin.id } });
     if (!existingProfile) {
       const dob = new Date(); dob.setFullYear(dob.getFullYear() - 28);
       await prisma.profile.create({
-        data: { userId: admin.id, firstName: "Son", dob, gender: "MAN", location: "Thảo Điền, Q2", bio: "Admin Lumen — Letters, not swipes. Liên hệ nbhson43@gmail.com", interests: JSON.stringify(["Coffee","Music","Books"]) },
+        data: { userId: admin.id, firstName: "nbhson", dob, gender: "MAN", location: "Thảo Điền, Q2", bio: "Admin Lumen — Letters, not swipes. Liên hệ nbhson43@gmail.com", interests: JSON.stringify(["Coffee","Music","Books"]) },
       });
     }
     // cleanup legacy admin email no longer used
