@@ -44,6 +44,8 @@ export class SimpleRecommendationEngine implements RecommendationEngine {
 
     const filtered = allCandidates.filter((c) => {
       if (!c.profile) return false;
+      // incognito users should not appear in discovery
+      if ((c as any).isIncognito) return false;
       if (prefs.interestedIn !== "EVERYONE") {
         const wanted = prefs.interestedIn;
         if (wanted === "MEN" && c.profile.gender !== "MAN") return false;
@@ -51,6 +53,18 @@ export class SimpleRecommendationEngine implements RecommendationEngine {
       }
       const age = getAge(c.profile.dob);
       if (age < prefs.minAge || age > prefs.maxAge) return false;
+      // advanced filters
+      if ((prefs as any).verifiedOnly && !(c as any).isVerified) return false;
+      if ((prefs as any).hasVoiceOnly && !c.profile.voiceUrl) return false;
+      if ((prefs as any).hasPhotoOnly && c.photos.length === 0) return false;
+      if ((prefs as any).educationFilter) {
+        try {
+          const ef = JSON.parse((prefs as any).educationFilter);
+          if (Array.isArray(ef) && ef.length && !ef.includes(c.profile.education)) return false;
+        } catch {
+          if ((prefs as any).educationFilter !== c.profile.education) return false;
+        }
+      }
       // distance filter if both have coords and maxDistance set
       if (prefs.maxDistance && user.profile?.latitude != null && user.profile?.longitude != null && c.profile?.latitude != null && c.profile?.longitude != null) {
         const d = haversineKm(
@@ -84,6 +98,9 @@ export class SimpleRecommendationEngine implements RecommendationEngine {
       score += sharedPrompts * 0.08;
 
       if (prefs.intent && c.preferences && (c.preferences as any).intent === prefs.intent) score += 0.1;
+      // verification boost
+      if ((c as any).isVerified) score += 0.08;
+      // priority stamp boost - keep random element
 
       // proximity boost: nearer = higher score (only if both have coords)
       if (user.profile?.latitude != null && c.profile?.latitude != null) {

@@ -12,6 +12,8 @@ export default function ChatClient({ matchId }: { matchId: string }) {
   const [slowInfo, setSlowInfo] = useState<{ remaining: number; resetAt?: string } | null>(null);
   const [starter, setStarter] = useState<string | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
   async function load() {
@@ -84,6 +86,12 @@ export default function ChatClient({ matchId }: { matchId: string }) {
         </div>
         <div className="ml-auto flex gap-2">
           <button
+            onClick={async()=>{ if(!confirm("Hủy kết nối?")) return; const r=await fetch(`/api/matches/${matchId}/unmatch`,{method:"POST"}); if(r.ok) window.location.href="/matches";}}
+            className="text-xs font-medium border border-[#FCE8EC] rounded-full px-3 py-1.5 bg-white hover:bg-[#FFF0F3] transition"
+          >
+            Hủy ghép
+          </button>
+          <button
             onClick={() => setReportOpen(true)}
             className="text-xs font-medium border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-full px-3.5 py-1.5 transition"
           >
@@ -140,13 +148,35 @@ export default function ChatClient({ matchId }: { matchId: string }) {
           </div>
         ) : (
           messages.map((m) => (
-            <div key={m.id} className={`flex ${m.isMine ? "justify-end" : "justify-start"}`}>
-              <div className={`max-w-[78%] rounded-[20px] px-4 py-3 text-sm leading-relaxed shadow-sm ${m.isMine ? "bg-[#2E1A22] text-white rounded-br-[6px] shadow-[0_4px_16px_rgba(46,26,34,0.18)]" : "bg-white border border-[#FCE8EC] rounded-bl-[6px] text-[#2E1A22]"}`}>
-                <div className={m.content.startsWith("“") ? "font-display italic" : ""}>{m.content}</div>
-                <div className={`text-[10px] font-mono mt-1.5 flex items-center gap-1 ${m.isMine ? "text-white/60 justify-end" : "text-[#B08A95]"}`}>
-                  {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                  {m.isMine && <span className="text-[10px]">✓✓</span>}
-                </div>
+            <div key={m.id} className={`flex ${m.isMine ? "justify-end" : "justify-start"} group`}>
+              <div className={`max-w-[78%] rounded-[20px] px-4 py-3 text-sm leading-relaxed shadow-sm relative ${m.isMine ? "bg-[#2E1A22] text-white rounded-br-[6px] shadow-[0_4px_16px_rgba(46,26,34,0.18)]" : "bg-white border border-[#FCE8EC] rounded-bl-[6px] text-[#2E1A22]"}`}>
+                {editingId===m.id ? (
+                  <div className="space-y-2">
+                    <textarea value={editContent} onChange={(e)=>setEditContent(e.target.value)} rows={2} className="w-full rounded-xl border border-white/30 bg-white text-[#2E1A22] p-2 text-sm" />
+                    <div className="flex gap-2 justify-end">
+                      <button onClick={()=>setEditingId(null)} className="text-xs px-3 py-1 rounded-full bg-white/20">Hủy</button>
+                      <button onClick={async()=>{
+                        const r=await fetch(`/api/matches/${matchId}/messages/${m.id}`,{method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify({content: editContent})});
+                        if(r.ok){ setEditingId(null); load(); } else { const d=await r.json(); alert(d.error); }
+                      }} className="text-xs px-3 py-1 rounded-full bg-white text-[#2E1A22]">Lưu</button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className={m.content.startsWith("“") ? "font-display italic" : ""}>{m.content} {m.isEdited && <span className="text-[10px] opacity-60">(đã sửa)</span>} {m.deletedAt && <span className="text-[10px] opacity-60">(đã thu hồi)</span>}</div>
+                    <div className={`text-[10px] font-mono mt-1.5 flex items-center gap-1 ${m.isMine ? "text-white/60 justify-end" : "text-[#B08A95]"}`}>
+                      {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      {m.isMine && m.read && <span className="text-[#FF8FA3]">✓✓ đã xem</span>}
+                      {m.isMine && !m.read && <span className="text-[10px]">✓✓</span>}
+                    </div>
+                    {m.isMine && !m.deletedAt && (
+                      <div className="hidden group-hover:flex gap-1 mt-1 justify-end">
+                        <button onClick={()=>{setEditingId(m.id); setEditContent(m.content);}} className="text-[10px] underline opacity-70 hover:opacity-100">Sửa (15p)</button>
+                        <button onClick={async()=>{ if(!confirm("Thu hồi?")) return; const r=await fetch(`/api/matches/${matchId}/messages/${m.id}`,{method:"DELETE"}); if(r.ok) load();}} className="text-[10px] underline opacity-70 hover:opacity-100">Xóa</button>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             </div>
           ))

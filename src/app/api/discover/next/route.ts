@@ -76,6 +76,8 @@ export async function GET() {
     distance = "Khoảng cách ẩn";
   }
 
+  // check favorite
+  const isFavorited = await prisma.favorite.findUnique({ where: { userId_targetId: { userId, targetId: candidate.id } } }).then(Boolean);
   const publicProfile = {
     id: candidate.id,
     name: candidate.profile.firstName,
@@ -95,6 +97,11 @@ export async function GET() {
     intent: (candidate.preferences as any)?.intent ?? "UNSURE",
     compatibility,
     dailyAnswer: dailyAnswer ? { question: dailyQuestion, answer: dailyAnswer.answer } : null,
+    isVerified: (candidate as any).isVerified ?? false,
+    isFavorited,
+    height: (candidate as any).height ?? null,
+    languages: (()=>{ try{ return (candidate as any).languages ? JSON.parse((candidate as any).languages):[]}catch{return []}})(),
+    religion: (candidate as any).religion ?? null,
   };
 
   return NextResponse.json({

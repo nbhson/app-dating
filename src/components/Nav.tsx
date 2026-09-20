@@ -21,6 +21,7 @@ export default function Nav() {
   }, [t, isAdmin]);
   const [unreadTotal, setUnreadTotal] = useState(0);
   const [unreadByMatch, setUnreadByMatch] = useState(0);
+  const [notifUnread, setNotifUnread] = useState(0);
 
   useEffect(() => {
     fetch("/api/admin/stats").then(r=>{ if(r.ok) setIsAdmin(true); }).catch(()=>{});
@@ -41,6 +42,8 @@ export default function Nav() {
           setUnreadTotal(total);
           setUnreadByMatch(countMatchesWithUnread);
         }
+        const rn = await fetch("/api/notifications?unread=true").then(x=>x.json()).catch(()=>null);
+        if (rn && !cancelled) setNotifUnread(rn.unreadCount ?? 0);
       } catch {}
     }
     load();
@@ -102,6 +105,11 @@ export default function Nav() {
                 </Link>
               );
             })}
+            {/* notifications quick access */}
+            <button onClick={async()=>{ const r=await fetch("/api/notifications"); const d=await r.json(); alert((d.notifications??[]).map((n:any)=>`${n.title}: ${n.body ?? ''}`).join('\n') || 'Không có thông báo'); fetch("/api/notifications",{method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify({markAll:true})}).then(()=>setNotifUnread(0));}} className="px-4 py-3 rounded-[20px] flex items-center gap-3.5 bg-white/60 border border-white/40 hover:bg-white text-[#2E1A22] transition">
+              <span className="w-9 h-9 rounded-full bg-[#FFF0F3] border border-[#FCE8EC] grid place-items-center text-[13px] relative">🔔 {notifUnread>0 && <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-[#FF4D6D] text-white text-[9px] font-bold grid place-items-center border-2 border-white">{notifUnread}</span>}</span>
+              <div className="text-left"><div className="text-[13px] font-semibold">Thông báo</div><div className="text-[11px] font-mono text-[#B08A95]">{notifUnread>0 ? `${notifUnread} mới` : 'Không có mới'}</div></div>
+            </button>
           </nav>
 
           <div className="mt-auto space-y-3 relative z-10">

@@ -40,6 +40,8 @@ export default function DiscoverClient() {
   const [showComment, setShowComment] = useState(false);
   const [reveal, setReveal] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [isPriority, setIsPriority] = useState(false);
+  const [favLoading, setFavLoading] = useState(false);
 
   async function fetchNext() {
     setLoading(true);
@@ -48,30 +50,48 @@ export default function DiscoverClient() {
     setShowComment(false);
     setSelectedAnchor(null);
     setComment("");
-    const res = await fetch("/api/discover/next");
-    const data = await res.json();
-    if (!res.ok) {
-      if (data.error === "DAILY_LIMIT_REACHED") {
-        setError("DAILY_LIMIT_REACHED");
-        setUsage({ viewed: data.viewed, limit: data.limit, remaining: 0 });
-      } else if (data.error === "PROFILE_INCOMPLETE") {
-        window.location.href = "/onboarding";
-        return;
-      } else if (data.error === "NO_PROFILES") {
+    try {
+      const res = await fetch("/api/discover/next");
+      let data: any = {};
+      try { data = await res.json(); } catch { data = {}; }
+      // handle NO_PROFILES even when 200
+      if (data.error === "NO_PROFILES") {
         setProfile(null);
         setError("NO_PROFILES");
         if (data.viewed !== undefined) setUsage({ viewed: data.viewed, limit: data.limit, remaining: data.limit - data.viewed });
-      } else {
-        setError(data.error ?? "UNKNOWN");
+        setLoading(false);
+        return;
       }
+      if (!res.ok) {
+        if (data.error === "DAILY_LIMIT_REACHED") {
+          setError("DAILY_LIMIT_REACHED");
+          setUsage({ viewed: data.viewed, limit: data.limit, remaining: 0 });
+        } else if (data.error === "PROFILE_INCOMPLETE") {
+          window.location.href = "/onboarding";
+          return;
+        } else {
+          setError(data.error ?? "UNKNOWN");
+        }
+        setLoading(false);
+        return;
+      }
+      if (!data.profile) {
+        setProfile(null);
+        setError("NO_PROFILES");
+        if (data.viewed !== undefined) setUsage({ viewed: data.viewed, limit: data.limit, remaining: data.limit - data.viewed });
+        else if (data.usage) setUsage(data.usage);
+        setLoading(false);
+        return;
+      }
+      setProfile(data.profile);
+      setUsage(data.usage);
+      if (data.dailyQuestion) setDailyQ(data.dailyQuestion);
+      setPhotoIdx(0);
+    } catch (e) {
+      setError("UNKNOWN");
+    } finally {
       setLoading(false);
-      return;
     }
-    setProfile(data.profile);
-    setUsage(data.usage);
-    if (data.dailyQuestion) setDailyQ(data.dailyQuestion);
-    setPhotoIdx(0);
-    setLoading(false);
   }
 
   useEffect(() => {
@@ -99,6 +119,7 @@ export default function DiscoverClient() {
     if (type === "like") {
       body.comment = comment.trim();
       body.anchor = selectedAnchor;
+      body.isPriority = isPriority;
     }
     const res = await fetch(`/api/discover/${type}`, {
       method: "POST",
@@ -329,20 +350,27 @@ export default function DiscoverClient() {
                     <button onClick={() => setPhotoIdx((p) => Math.min(profile.photos.length - 1, p + 1))} className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/85 backdrop-blur text-[#2E1A22] grid place-items-center text-sm shadow-[0_4px_12px_rgba(0,0,0,0.12)] hover:bg-white transition">›</button>
 
                     <div className="absolute inset-x-0 bottom-0 p-6 bg-gradient-to-t from-[#1F1218]/85 via-[#1F1218]/25 to-transparent text-white">
-                      <div className="font-display text-[24px] leading-none font-medium flex items-baseline gap-2">{profile.name}, <span className="font-light">{profile.age}</span> <span className="ml-1 w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] inline-block" /></div>
+                      <div className="font-display text-[24px] leading-none font-medium flex items-baseline gap-2">{profile.name}, <span className="font-light">{profile.age}</span> <span className="ml-1 w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] inline-block" /> {(profile as any).isVerified && <span className="w-5 h-5 rounded-full bg-[#1DA1F2] text-white grid place-items-center text-[10px] border-2 border-white">✓</span>} <button
+                        onClick={async (e)=>{ e.stopPropagation(); if(!profile) return; setFavLoading(true); const method = (profile as any).isFavorited ? "DELETE" : "POST"; const url = method==="POST" ? "/api/favorites" : `/api/favorites?targetId=${profile.id}`; const body = method==="POST" ? JSON.stringify({targetId: profile.id}) : undefined; const r=await fetch(url, {method, headers: {"Content-Type":"application/json"}, body}); if(r.ok) setProfile((p:any)=> p ? {...p, isFavorited: !p.isFavorited}:p); setFavLoading(false);}}
+                        disabled={favLoading}
+                        className={`ml-1 w-7 h-7 rounded-full grid place-items-center text-xs border transition ${(profile as any).isFavorited ? 'bg-[#FF4D6D] text-white border-[#FF4D6D]' : 'bg-white/20 backdrop-blur border-white/40 text-white hover:bg-white hover:text-[#FF4D6D]'}`}
+                        title={(profile as any).isFavorited ? 'Bỏ lưu' : 'Lưu'}
+                      >{(profile as any).isFavorited ? '♥' : '♡'}</button></div>
                       <div className="text-xs font-medium opacity-90 mt-2 flex flex-wrap items-center gap-2">
                         <span className="bg-white/15 backdrop-blur border border-white/20 px-2.5 py-1 rounded-full">{profile.distance} · {profile.location}</span>
                         {profile.intent && <span className="px-2.5 py-1 rounded-full bg-white text-[#2E1A22] text-[11px] font-semibold">{intentLabel[profile.intent] ?? profile.intent}</span>}
+                        {(profile as any).height && <span className="bg-white/15 backdrop-blur border border-white/20 px-2 py-1 rounded-full text-[11px]">{(profile as any).height}cm</span>}
                       </div>
                     </div>
                   </div>
                   <div className="p-4 flex items-center justify-between bg-white/60 backdrop-blur border-t border-white/60">
-                    <div className="flex gap-1.5">
+                    <div className="flex gap-1.5 items-center">
                       {profile.voiceUrl ? (
                         <span className="px-3 py-1.5 rounded-full bg-white border border-[#FCE8EC] text-xs font-medium flex items-center gap-1.5 shadow-sm"><span className="w-6 h-6 rounded-full gradient-primary grid place-items-center text-white text-[10px]">▶</span> {trans("discover.voiceAvailable", { duration: profile.voiceDuration ?? 15 })}</span>
                       ) : (
                         <span className="px-3 py-1.5 rounded-full bg-white/70 border border-[#FCE8EC] text-xs text-[#8E6B75]">{t.discover.noVoice}</span>
                       )}
+                      <button onClick={async()=>{ const r=await fetch("/api/discover/undo", {method:"POST"}); const d=await r.json(); if(r.ok) fetchNext(); else alert(d.error); }} className="text-xs font-medium border border-[#FCE8EC] rounded-full px-3 py-1.5 bg-white/70 hover:bg-white transition" title="Hoàn tác pass 5 phút">↩ Undo</button>
                     </div>
                     <div className="flex gap-2">
                       <button
@@ -458,6 +486,12 @@ export default function DiscoverClient() {
                       className="w-full rounded-2xl border border-[#FCE8EC] bg-[#FFFCFA] p-3.5 text-sm outline-none focus:border-[#FF8FA3] focus:bg-white placeholder:text-[#B08A95] resize-none transition"
                       onFocus={() => setShowComment(true)}
                     />
+                    <div className="flex items-center gap-2 text-xs">
+                      <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                        <input type="checkbox" checked={isPriority} onChange={(e)=>setIsPriority(e.target.checked)} className="accent-[#FF4D6D]" />
+                        <span className={`px-2 py-1 rounded-full border text-[11px] font-semibold ${isPriority ? 'bg-amber-400 border-amber-400 text-white' : 'bg-white border-[#FCE8EC] text-[#8E6B75]'}`}>✦ Tem ưu tiên {isPriority && '(xài 1 tem)'}</span>
+                      </label>
+                    </div>
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] font-mono text-[#B08A95] font-medium">{comment.length}/140 {comment.length >= 6 && <span className="text-emerald-500">✓</span>}</span>
                       <div className="flex gap-2">
@@ -471,9 +505,9 @@ export default function DiscoverClient() {
                         <button
                           onClick={() => act("like")}
                           disabled={actionLoading || comment.trim().length < 6}
-                          className="h-10 px-6 rounded-full btn-primary text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
+                          className={`h-10 px-6 rounded-full text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed ${isPriority ? 'bg-amber-500 text-white hover:bg-amber-600' : 'btn-primary'}`}
                         >
-                          {actionLoading ? "..." : t.discover.sendCard}
+                          {actionLoading ? "..." : isPriority ? "✦ Gửi ưu tiên" : t.discover.sendCard}
                         </button>
                       </div>
                     </div>

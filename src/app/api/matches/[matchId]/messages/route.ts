@@ -23,7 +23,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ matchId
 
   await prisma.message.updateMany({
     where: { matchId, senderId: { not: userId }, read: false },
-    data: { read: true },
+    data: { read: true, readAt: new Date() },
   });
 
   const otherId = match.userAId === userId ? match.userBId : match.userAId;
@@ -48,6 +48,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ matchId
       senderId: m.senderId,
       createdAt: m.createdAt,
       isMine: m.senderId === userId,
+      read: m.read,
+      readAt: (m as any).readAt,
+      editedAt: (m as any).editedAt,
+      isEdited: (m as any).isEdited,
+      deletedAt: (m as any).deletedAt,
     })),
     other: other
       ? {
@@ -92,6 +97,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ matchId
   const message = await prisma.message.create({
     data: { matchId, senderId: userId, content: content.trim() },
   });
+  // notify recipient
+  try {
+    await prisma.notification.create({
+      data: { userId: otherId, type: "MESSAGE", title: "Thư mới ✉", body: content.trim().slice(0, 60), link: `/matches/${matchId}` },
+    });
+  } catch {}
 
   return NextResponse.json({ message: { id: message.id, content: message.content, createdAt: message.createdAt } });
 }

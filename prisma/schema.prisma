@@ -8,16 +8,30 @@ datasource db {
 }
 
 model User {
-  id             String    @id @default(cuid())
-  email          String?   @unique
-  name           String?
-  avatarUrl      String?
-  passwordHash   String?
-  status         String    @default("ACTIVE")
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  lastActiveAt   DateTime  @default(now())
-  isAdmin        Boolean   @default(false)
+  id               String    @id @default(cuid())
+  email            String?   @unique
+  name             String?
+  avatarUrl        String?
+  passwordHash     String?
+  status           String    @default("ACTIVE")
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  lastActiveAt     DateTime  @default(now())
+  isAdmin          Boolean   @default(false)
+  // new fields
+  isVerified       Boolean   @default(false)
+  verifiedAt       DateTime?
+  verificationStatus String @default("NONE") // NONE, PENDING, VERIFIED, REJECTED
+  isIncognito      Boolean   @default(false)
+  premiumUntil     DateTime?
+  stamps           Int       @default(3) // priority letters per week
+  stampsResetAt    DateTime?
+  height           Int?
+  languages        String?   // JSON array
+  religion         String?
+  wantKids         String?
+  smoking          String?   // NEVER, SOCIAL, OFTEN
+  drinking         String?
 
   profile        Profile?
   photos         ProfilePhoto[]
@@ -38,9 +52,17 @@ model User {
   dailyAnswers   DailyAnswer[]
   accounts       Account[]
   sessions       Session[]
+  favorites      Favorite[] @relation("favoriter")
+  favoritedBy    Favorite[] @relation("favorited")
+  notifications  Notification[]
+  verificationRequests VerificationRequest[]
+  adminActions   AdminAction[] @relation("adminActor")
+  adminTargets   AdminAction[] @relation("adminTarget")
 
   @@index([status])
   @@index([lastActiveAt])
+  @@index([isVerified])
+  @@index([verificationStatus])
 }
 
 model Account {
@@ -108,6 +130,9 @@ model ProfilePhoto {
   url       String
   position  Int
   createdAt DateTime @default(now())
+  status    String   @default("APPROVED") // PENDING, APPROVED, REJECTED
+  moderatedAt DateTime?
+  moderatedBy String?
 
   @@index([userId, position])
 }
@@ -121,6 +146,11 @@ model Preference {
   maxAge       Int    @default(99)
   maxDistance  Int?
   intent       String @default("UNSURE") // LONG_TERM, SHORT_TERM, FRIENDSHIP, EXPLORING, UNSURE
+  // advanced filters
+  educationFilter String? // JSON array or single
+  hasVoiceOnly Boolean @default(false)
+  hasPhotoOnly Boolean @default(false)
+  verifiedOnly Boolean @default(false)
 }
 
 model Like {
@@ -129,6 +159,7 @@ model Like {
   toUserId   String
   comment    String?
   promptId   String?
+  isPriority Boolean  @default(false)
   createdAt  DateTime @default(now())
   fromUser   User     @relation("likesFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
   toUser     User     @relation("likesTo", fields: [toUserId], references: [id], onDelete: Cascade)
@@ -136,6 +167,7 @@ model Like {
   @@unique([fromUserId, toUserId])
   @@index([fromUserId])
   @@index([toUserId])
+  @@index([isPriority])
 }
 
 model Pass {
@@ -164,6 +196,7 @@ model Match {
   @@unique([userAId, userBId])
   @@index([userAId])
   @@index([userBId])
+  @@index([status])
 }
 
 model Message {
@@ -173,11 +206,16 @@ model Message {
   content   String
   createdAt DateTime @default(now())
   read      Boolean  @default(false)
+  readAt    DateTime?
+  editedAt  DateTime?
+  deletedAt DateTime?
+  isEdited  Boolean  @default(false)
   match     Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
   sender    User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
 
   @@index([matchId, createdAt])
   @@index([senderId])
+  @@index([deletedAt])
 }
 
 model Block {
@@ -200,12 +238,17 @@ model Report {
   reason     String
   details    String?
   createdAt  DateTime @default(now())
-  status     String   @default("PENDING")
+  status     String   @default("PENDING") // PENDING, RESOLVED, DISMISSED
+  reviewedAt DateTime?
+  reviewedBy String?
+  actionTaken String?
+  resolutionNote String?
   reporter   User     @relation("reporter", fields: [reporterId], references: [id], onDelete: Cascade)
   reported   User     @relation("reported", fields: [reportedId], references: [id], onDelete: Cascade)
 
   @@index([reporterId])
   @@index([reportedId])
+  @@index([status])
 }
 
 model DailyUsage {
@@ -229,16 +272,20 @@ model PromptAnswer {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   question  String
   answer    String
+  status    String   @default("APPROVED")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([userId])
+  @@index([status])
 }
 
 model DailyQuestion {
   id        String   @id @default(cuid())
   date      String   @unique
   question  String
+  createdBy String?
+  isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
 }
 
@@ -253,4 +300,86 @@ model DailyAnswer {
 
   @@unique([userId, date])
   @@index([date])
+}
+
+// New models
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  targetId  String
+  createdAt DateTime @default(now())
+  user      User     @relation("favoriter", fields: [userId], references: [id], onDelete: Cascade)
+  target    User     @relation("favorited", fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, targetId])
+  @@index([userId])
+  @@index([targetId])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   // MATCH, MESSAGE, LIKE, SYSTEM, VERIFICATION
+  title     String
+  body      String?
+  link      String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
+}
+
+model AdminAction {
+  id        String   @id @default(cuid())
+  adminId   String
+  targetId  String?
+  action    String   // SUSPEND, ACTIVATE, DELETE, VERIFY, REJECT_VERIFY, RESOLVE_REPORT, etc
+  reason    String?
+  metadata  String?  // JSON
+  createdAt DateTime @default(now())
+  admin     User     @relation("adminActor", fields: [adminId], references: [id], onDelete: Cascade)
+  target    User?    @relation("adminTarget", fields: [targetId], references: [id], onDelete: SetNull)
+
+  @@index([adminId])
+  @@index([targetId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+model SystemConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+}
+
+model Announcement {
+  id        String   @id @default(cuid())
+  title     String
+  body      String
+  isActive  Boolean  @default(true)
+  createdBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+}
+
+model VerificationRequest {
+  id        String   @id @default(cuid())
+  userId    String
+  photoUrl  String
+  status    String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  note      String?
+  reviewedBy String?
+  createdAt DateTime @default(now())
+  reviewedAt DateTime?
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
 }

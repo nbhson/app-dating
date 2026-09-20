@@ -7,8 +7,13 @@ export async function POST(req: Request) {
   const session = await auth();
   const userId = (session?.user as any)?.id as string | undefined;
   if (!userId) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
-  const { toUserId, comment, anchor } = await req.json();
+  const { toUserId, comment, anchor, isPriority } = await req.json();
   if (!toUserId || toUserId === userId) return NextResponse.json({ error: "INVALID_TARGET" }, { status: 400 });
+  // stamps check for priority
+  if (isPriority) {
+    const me = await prisma.user.findUnique({ where: { id: userId }, select: { stamps: true, premiumUntil: true } });
+    if (!me || (me.stamps ?? 0) <= 0) return NextResponse.json({ error: "NO_STAMPS" }, { status: 402 });
+  }
 
   // Lumen: require comment 6-140 chars
   if (!comment || typeof comment !== "string" || comment.trim().length < 6) {
@@ -40,7 +45,14 @@ export async function POST(req: Request) {
 
   const reciprocal = await prisma.like.findUnique({ where: { fromUserId_toUserId: { fromUserId: toUserId, toUserId: userId } } });
 
-  await prisma.like.create({ data: { fromUserId: userId, toUserId, comment: comment.trim().slice(0, 140), promptId: anchor ? String(anchor).slice(0, 200) : null } });
+  await prisma.like.create({ data: { fromUserId: userId, toUserId, comment: comment.trim().slice(0, 140), promptId: anchor ? String(anchor).slice(0, 200) : null, isPriority: !!isPriority } });
+  if (isPriority) {
+    await prisma.user.update({ where: { id: userId }, data: { stamps: { decrement: 1 } } });
+  }
+  // notify recipient
+  try {
+    await prisma.notification.create({ data: { userId: toUserId, type: "LIKE", title: isPriority ? "Bưu thiếp ưu tiên! ✦" : "Bạn có bưu thiếp mới", body: comment.trim().slice(0, 80), link: "/matches" } });
+  } catch {}
 
   if (reciprocal) {
     const userAId = userId < toUserId ? userId : toUserId;
@@ -64,6 +76,15 @@ export async function POST(req: Request) {
           await prisma.message.create({ data: { matchId, senderId: toUserId, content: `“${reciprocal.comment}” — bưu thiếp mở lời` } });
         }
       }
+      // notify both
+      try {
+        await prisma.notification.createMany({
+          data: [
+            { userId: toUserId, type: "MATCH", title: "Đã kết nối ♥", body: `Bạn và ${userId.slice(0, 6)} đã ghép đôi`, link: `/matches/${matchId}` },
+            { userId, type: "MATCH", title: "Đã kết nối ♥", body: `Bạn và ${toUserId.slice(0, 6)} đã ghép đôi`, link: `/matches/${matchId}` },
+          ],
+        });
+      } catch {}
     } catch {}
     return NextResponse.json({ status: existingMatch ? "MATCH_EXISTS" : "MATCH_CREATED", matchId });
   }

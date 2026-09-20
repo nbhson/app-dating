@@ -19,7 +19,7 @@ export async function PATCH(req: Request) {
   const userId = (session?.user as any)?.id as string | undefined;
   if (!userId) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   const body = await req.json();
-  const { firstName, dob, gender, location, latitude, longitude, bio, occupation, education, interests, preferences, promptAnswers, voiceUrl, voiceDuration } = body;
+  const { firstName, dob, gender, location, latitude, longitude, bio, occupation, education, interests, preferences, promptAnswers, voiceUrl, voiceDuration, isIncognito, height, languages, religion, wantKids, smoking, drinking } = body;
 
   if (interests && !Array.isArray(interests)) return NextResponse.json({ error: "INVALID_INTERESTS" }, { status: 400 });
 
@@ -68,12 +68,31 @@ export async function PATCH(req: Request) {
     if (preferences.maxAge !== undefined) prefData.maxAge = preferences.maxAge;
     if (preferences.maxDistance !== undefined) prefData.maxDistance = preferences.maxDistance;
     if (preferences.intent) prefData.intent = preferences.intent;
+    if (preferences.verifiedOnly !== undefined) prefData.verifiedOnly = !!preferences.verifiedOnly;
+    if (preferences.hasVoiceOnly !== undefined) prefData.hasVoiceOnly = !!preferences.hasVoiceOnly;
+    if (preferences.hasPhotoOnly !== undefined) prefData.hasPhotoOnly = !!preferences.hasPhotoOnly;
+    if (preferences.educationFilter !== undefined) prefData.educationFilter = preferences.educationFilter ? String(preferences.educationFilter) : null;
     const existingPref = await prisma.preference.findUnique({ where: { userId } });
     if (existingPref) {
       await prisma.preference.update({ where: { userId }, data: prefData });
     } else {
       await prisma.preference.create({ data: { userId, ...prefData } });
     }
+  }
+
+  if (isIncognito !== undefined) {
+    await prisma.user.update({ where: { id: userId }, data: { isIncognito: !!isIncognito } });
+  }
+  // extended profile fields on User
+  const userExtra: any = {};
+  if (height !== undefined) userExtra.height = height ? Number(height) : null;
+  if (languages !== undefined) userExtra.languages = languages ? JSON.stringify(languages) : null;
+  if (religion !== undefined) userExtra.religion = religion || null;
+  if (wantKids !== undefined) userExtra.wantKids = wantKids || null;
+  if (smoking !== undefined) userExtra.smoking = smoking || null;
+  if (drinking !== undefined) userExtra.drinking = drinking || null;
+  if (Object.keys(userExtra).length) {
+    await prisma.user.update({ where: { id: userId }, data: userExtra });
   }
 
   if (Array.isArray(promptAnswers)) {
