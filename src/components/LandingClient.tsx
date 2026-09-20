@@ -18,9 +18,9 @@ export default function LandingClient() {
 
   return (
     <div className="min-h-screen flex flex-col relative overflow-hidden">
-      {/* soft aura orbs behind */}
-      <div className="aura aura-peach w-[520px] h-[520px] -top-24 -left-24 opacity-40" />
-      <div className="aura aura-lavender w-[700px] h-[500px] top-0 right-0 opacity-40" />
+      {/* soft aura orbs behind — now with YT-inspired drift adapted for dating */}
+      <div className="aura aura-peach w-[520px] h-[520px] -top-24 -left-24 opacity-40 animate-aura-drift" />
+      <div className="aura aura-lavender w-[700px] h-[500px] top-0 right-0 opacity-40 animate-aura-drift-slow" />
 
       <div className="flex-1 grid lg:grid-cols-[1.05fr_0.95fr] max-w-[1280px] mx-auto w-full relative">
         {/* LEFT */}
@@ -138,8 +138,8 @@ export default function LandingClient() {
         <div className="hidden lg:flex relative items-center justify-center p-8 xl:p-10 overflow-hidden">
           <div className="absolute inset-0 -z-10">
             <div className="absolute inset-0 bg-gradient-to-br from-[#FFF0F3] via-[#FFF7F5] to-[#F3EFFF]" />
-            <div className="aura aura-peach w-[420px] h-[420px] top-12 right-12" />
-            <div className="aura aura-lavender w-[520px] h-[520px] bottom-0 left-8" />
+            <div className="aura aura-peach w-[420px] h-[420px] top-12 right-12 animate-aura-drift" />
+            <div className="aura aura-lavender w-[520px] h-[520px] bottom-0 left-8 animate-aura-drift-slow" />
             <div className="absolute inset-0 opacity-[0.015]" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")` }} />
           </div>
 

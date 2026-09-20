@@ -48,19 +48,24 @@ body {
   overflow-x: hidden;
 }
 
-/* === MESH GRADIENT BACKGROUND === */
+/* === MESH GRADIENT BACKGROUND — Dating adaptation of YT floating orbs === */
 body::before {
   content: "";
   position: fixed;
-  inset: 0;
+  inset: -10%;
+  width: 120%;
+  height: 120%;
   pointer-events: none;
   z-index: -2;
-  background:
-    radial-gradient(1200px 600px at 15% -10%, rgba(255, 181, 167, 0.35) 0%, transparent 60%),
-    radial-gradient(900px 700px at 95% 0%, rgba(232, 222, 255, 0.45) 0%, transparent 60%),
-    radial-gradient(800px 600px at 50% 115%, rgba(255, 214, 222, 0.5) 0%, transparent 60%),
-    radial-gradient(600px 400px at 0% 60%, rgba(255, 143, 163, 0.12) 0%, transparent 60%),
+  will-change: transform;
+  /* giữ palette ấm của Lumen nhưng dùng shape circle như YT để xoay rõ */
+  background-image:
+    radial-gradient(circle at 20% 20%, rgba(255, 77, 109, 0.18) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(232, 222, 255, 0.55) 0%, transparent 50%),
+    radial-gradient(circle at 40% 40%, rgba(255, 181, 167, 0.30) 0%, transparent 50%),
+    radial-gradient(900px 700px at 50% 115%, rgba(255, 214, 222, 0.45) 0%, transparent 60%),
     linear-gradient(180deg, #FFF7F5 0%, #FFF0EE 100%);
+  animation: dating-mesh-drift 25s ease-in-out infinite;
 }
 
 body::after {
@@ -180,9 +185,28 @@ body::after {
   0% { background-position: -200% center; }
   100% { background-position: 200% center; }
 }
+/* YT's `floating` đúng gốc: translate + rotate 120deg/240deg, adapt palette ấm */
+@keyframes dating-mesh-drift {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  33% { transform: translate(30px, -30px) rotate(120deg); }
+  66% { transform: translate(-20px, 20px) rotate(240deg); }
+}
+@keyframes dating-aura-drift {
+  0%, 100% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 0.52; }
+  33% { transform: translate(24px, -18px) rotate(1deg) scale(1.08); opacity: 0.62; }
+  66% { transform: translate(-16px, 14px) rotate(-1deg) scale(1.04); opacity: 0.56; }
+}
 .animate-float { animation: float 6s ease-in-out infinite; }
 .animate-float-2 { animation: float-2 5s ease-in-out infinite; }
 .animate-pulse-soft { animation: pulse-soft 2.5s ease-in-out infinite; }
+.animate-aura-drift { animation: dating-aura-drift 18s ease-in-out infinite; }
+.animate-aura-drift-slow { animation: dating-aura-drift 24s ease-in-out infinite reverse; }
+
+@media (prefers-reduced-motion: reduce) {
+  body::before, .animate-float, .animate-float-2, .animate-pulse-soft, .animate-aura-drift, .animate-aura-drift-slow {
+    animation: none !important;
+  }
+}
 
 /* hide scrollbar but keep scroll */
 .no-scrollbar::-webkit-scrollbar { display: none; }
