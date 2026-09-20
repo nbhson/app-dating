@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { useI18n } from "@/lib/i18n/context";
+import { usePopup } from "@/components/ui/PopupProvider";
 
 type Prompt = { id: string; question: string; answer: string };
 type Profile = {
@@ -26,6 +27,7 @@ type Profile = {
 
 export default function DiscoverClient() {
   const { t, trans, locale } = useI18n();
+  const { toast, confirm, showAlert } = usePopup();
   const intentLabel = t.intent as Record<string, string>;
   const [profile, setProfile] = useState<Profile | null>(null);
   const [usage, setUsage] = useState<{ viewed: number; limit: number; remaining: number } | null>(null);
@@ -370,7 +372,7 @@ export default function DiscoverClient() {
                       ) : (
                         <span className="px-3 py-1.5 rounded-full bg-white/70 border border-[#FCE8EC] text-xs text-[#8E6B75]">{t.discover.noVoice}</span>
                       )}
-                      <button onClick={async()=>{ const r=await fetch("/api/discover/undo", {method:"POST"}); const d=await r.json(); if(r.ok) fetchNext(); else alert(d.error); }} className="text-xs font-medium border border-[#FCE8EC] rounded-full px-3 py-1.5 bg-white/70 hover:bg-white transition" title="Hoàn tác pass 5 phút">↩ Undo</button>
+                      <button onClick={async()=>{ const r=await fetch("/api/discover/undo", {method:"POST"}); const d=await r.json(); if(r.ok){ toast((t.discover as any).undo ?? "Đã hoàn tác", "success"); fetchNext(); } else toast(d.error ?? (t.discover as any).undoExpired ?? "Không thể hoàn tác", "error"); }} className="text-xs font-medium border border-[#FCE8EC] rounded-full px-3 py-1.5 bg-white/70 hover:bg-white transition" title="Hoàn tác pass 5 phút">↩ {(t.discover as any).undo ?? "Undo"}</button>
                     </div>
                     <div className="flex gap-2">
                       <button
@@ -381,8 +383,10 @@ export default function DiscoverClient() {
                       </button>
                       <button
                         onClick={async () => {
-                          if (!confirm(`Chặn ${profile.name}?`)) return;
+                          const ok = await confirm({ title: `Chặn ${profile.name}?`, description: t.chat.blockConfirm ? trans("chat.blockConfirm", { name: profile.name }) : undefined, variant: "danger", confirmText: t.chat.block, cancelText: t.common.cancel });
+                          if (!ok) return;
                           await fetch(`/api/users/${profile.id}/block`, { method: "POST" });
+                          toast("Đã chặn", "success");
                           fetchNext();
                         }}
                         className="text-xs font-medium text-[#8E6B75] hover:text-[#2E1A22] border border-[#FCE8EC] rounded-full px-3.5 py-1.5 bg-white/70 hover:bg-white transition"
@@ -396,7 +400,7 @@ export default function DiscoverClient() {
                       onClose={() => setReportOpen(false)}
                       onSubmit={async (reason, details) => {
                         await fetch(`/api/users/${profile.id}/report`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason, details }) });
-                        alert(t.discover.reportSent);
+                        toast(t.discover.reportSent, "success");
                         setReportOpen(false);
                         fetchNext();
                       }}

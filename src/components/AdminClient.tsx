@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Nav from "@/components/Nav";
 import { useI18n } from "@/lib/i18n/context";
+import { usePopup } from "@/components/ui/PopupProvider";
 
 function fmtDate(iso?: string | null) {
   if (!iso) return "—";
@@ -13,6 +14,7 @@ type Tab = "overview"|"users"|"reports"|"questions"|"moderation"|"analytics"|"co
 
 export default function AdminClient({ isAdmin }: { isAdmin: boolean }) {
   const { t, trans } = useI18n();
+  const { toast, confirm } = usePopup();
   const [tab, setTab] = useState<Tab>("overview");
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -147,17 +149,18 @@ export default function AdminClient({ isAdmin }: { isAdmin: boolean }) {
     [s.discoveryToday, data.discoveryToday],
   ];
 
+  const atabs = (t.admin as any).tabs;
   const tabs: [Tab,string][] = [
-    ["overview","Tổng quan"],
-    ["users","Người dùng"],
-    ["reports","Báo cáo"],
-    ["questions","Câu hỏi ngày"],
-    ["moderation","Kiểm duyệt"],
-    ["verification","Xác minh"],
-    ["analytics","Phân tích"],
-    ["announcements","Thông báo"],
-    ["config","Cấu hình"],
-    ["audit","Nhật ký"],
+    ["overview", atabs.overview],
+    ["users", atabs.users],
+    ["reports", atabs.reports],
+    ["questions", atabs.questions],
+    ["moderation", atabs.moderation],
+    ["verification", atabs.verification],
+    ["analytics", atabs.analytics],
+    ["announcements", atabs.announcements],
+    ["config", atabs.config],
+    ["audit", atabs.audit],
   ];
 
   return (
@@ -223,27 +226,27 @@ export default function AdminClient({ isAdmin }: { isAdmin: boolean }) {
             {tab==="users" && (
               <div className="flex-1 min-h-0 flex flex-col gap-3 overflow-hidden">
                 <div className="flex flex-wrap gap-2">
-                  <input value={usersQ} onChange={(e)=>{setUsersQ(e.target.value); setUsersPage(1);}} placeholder="Tìm email / tên..." className="h-10 rounded-full border border-[#FCE8EC] bg-white px-4 text-sm flex-1 min-w-[180px]" />
+                  <input value={usersQ} onChange={(e)=>{setUsersQ(e.target.value); setUsersPage(1);}} placeholder={(t.admin as any).usersView.searchPlaceholder} className="h-10 rounded-full border border-[#FCE8EC] bg-white px-4 text-sm flex-1 min-w-[180px]" />
                   <select value={usersStatus} onChange={(e)=>{setUsersStatus(e.target.value); setUsersPage(1);}} className="h-10 rounded-full border border-[#FCE8EC] bg-white px-3 text-sm">
-                    <option value="">Tất cả trạng thái</option><option value="ACTIVE">ACTIVE</option><option value="SUSPENDED">SUSPENDED</option><option value="DELETED">DELETED</option>
+                    <option value="">{(t.admin as any).usersView.statusAll}</option><option value="ACTIVE">ACTIVE</option><option value="SUSPENDED">SUSPENDED</option><option value="DELETED">DELETED</option>
                   </select>
-                  <span className="text-xs font-mono bg-white border border-[#FCE8EC] px-3 py-2 rounded-full self-center">{usersTotal} kết quả</span>
+                  <span className="text-xs font-mono bg-white border border-[#FCE8EC] px-3 py-2 rounded-full self-center">{trans("admin.usersView.totalResults", {count: usersTotal})}</span>
                 </div>
                 <div className="flex-1 min-h-0 overflow-y-auto space-y-2 pr-1">
                   {users.map((u:any)=>(
                     <div key={u.id} className="flex items-center gap-3 text-sm rounded-[16px] border border-[#FCE8EC] bg-white px-3 py-2 cursor-pointer" onClick={()=>openProfile(u.id)}>
                       <div className="w-10 h-10 rounded-full overflow-hidden bg-[#FFE8EC] border border-white">{u.photos?.[0]?.url ? <img src={u.photos[0].url} alt="" className="w-full h-full object-cover"/> : <div className="w-full h-full grid place-items-center text-[#FF4D6D]">♥</div>}</div>
                       <div className="flex-1 min-w-0"><div className="font-medium truncate">{u.profile?.firstName ?? u.name ?? u.email} {u.isVerified && <span className="text-[#1DA1F2]">✓</span>} <span className="text-[10px] px-1.5 py-0.5 rounded-full border ml-1">{u.status}</span></div><div className="text-xs text-[#B08A95] truncate">{u.email}</div></div>
-                      <div className="flex gap-1" onClick={(e)=>e.stopPropagation()}>
-                        {u.status!=="SUSPENDED" ? <button onClick={()=>handleSuspendUser(u.id)} className="text-xs bg-amber-50 border border-amber-200 rounded-full px-2.5 py-1">Khóa</button> : <button onClick={()=>handleActivateUser(u.id)} className="text-xs bg-emerald-50 border rounded-full px-2.5 py-1">Mở</button>}
+                       <div className="flex gap-1" onClick={(e)=>e.stopPropagation()}>
+                        {u.status!=="SUSPENDED" ? <button onClick={()=>handleSuspendUser(u.id)} className="text-xs bg-amber-50 border border-amber-200 rounded-full px-2.5 py-1">{(t.admin as any).suspend}</button> : <button onClick={()=>handleActivateUser(u.id)} className="text-xs bg-emerald-50 border rounded-full px-2.5 py-1">{(t.admin as any).activate}</button>}
                       </div>
                     </div>
                   ))}
                 </div>
                 <div className="flex gap-2 justify-center">
-                  <button disabled={usersPage<=1} onClick={()=>setUsersPage(p=>Math.max(1,p-1))} className="px-4 py-2 rounded-full bg-white border border-[#FCE8EC] text-sm disabled:opacity-40">Trước</button>
-                  <span className="px-3 py-2 text-sm font-mono">Trang {usersPage}</span>
-                  <button onClick={()=>setUsersPage(p=>p+1)} className="px-4 py-2 rounded-full bg-white border border-[#FCE8EC] text-sm">Sau</button>
+                  <button disabled={usersPage<=1} onClick={()=>setUsersPage(p=>Math.max(1,p-1))} className="px-4 py-2 rounded-full bg-white border border-[#FCE8EC] text-sm disabled:opacity-40">{(t.admin as any).usersView.prev}</button>
+                  <span className="px-3 py-2 text-sm font-mono">{trans("admin.usersView.page", {page: usersPage})}</span>
+                  <button onClick={()=>setUsersPage(p=>p+1)} className="px-4 py-2 rounded-full bg-white border border-[#FCE8EC] text-sm">{(t.admin as any).usersView.next}</button>
                 </div>
               </div>
             )}
@@ -251,8 +254,13 @@ export default function AdminClient({ isAdmin }: { isAdmin: boolean }) {
             {tab==="reports" && (
               <div className="flex-1 min-h-0 flex flex-col gap-3 overflow-hidden">
                 <div className="flex gap-2 flex-wrap">
-                  {["PENDING","RESOLVED","DISMISSED",""].map(s=>(
-                    <button key={s||"all"} onClick={()=>setReportsStatus(s)} className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${reportsStatus===s ? "bg-[#2E1A22] text-white border-[#2E1A22]" : "bg-white border-[#FCE8EC]"}`}>{s||"Tất cả"}</button>
+                  {[
+                    ["PENDING",(t.admin as any).reportsView.pending],
+                    ["RESOLVED",(t.admin as any).reportsView.resolved],
+                    ["DISMISSED",(t.admin as any).reportsView.dismissed],
+                    ["",(t.admin as any).reportsView.all],
+                  ].map(([s,label])=>(
+                    <button key={s||"all"} onClick={()=>setReportsStatus(s)} className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${reportsStatus===s ? "bg-[#2E1A22] text-white border-[#2E1A22]" : "bg-white border-[#FCE8EC]"}`}>{label}</button>
                   ))}
                 </div>
                 <div className="flex-1 min-h-0 overflow-y-auto space-y-2 pr-1">
@@ -278,11 +286,11 @@ export default function AdminClient({ isAdmin }: { isAdmin: boolean }) {
             {tab==="questions" && (
               <div className="flex-1 min-h-0 flex flex-col gap-4 overflow-hidden">
                 <div className="rounded-2xl border border-[#FCE8EC] bg-white p-4 space-y-3">
-                  <h3 className="font-semibold">Thêm / cập nhật câu hỏi</h3>
+                  <h3 className="font-semibold">{(t.admin as any).questionsView.title}</h3>
                   <div className="flex flex-wrap gap-2">
                     <input type="date" value={dqDate} onChange={(e)=>setDqDate(e.target.value)} className="h-10 rounded-xl border border-[#FCE8EC] px-3 text-sm" />
-                    <input value={dqQuestion} onChange={(e)=>setDqQuestion(e.target.value)} placeholder="Nhập câu hỏi..." className="flex-1 min-w-[200px] h-10 rounded-xl border border-[#FCE8EC] px-3 text-sm" />
-                    <button onClick={async()=>{ if(!dqQuestion.trim()) return alert("Nhập câu hỏi"); await fetch("/api/admin/daily-questions",{method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({date:dqDate, question:dqQuestion})}); setDqQuestion(""); const r=await fetch("/api/admin/daily-questions").then(x=>x.json()); setDqList(r.questions??[]); }} className="px-5 h-10 rounded-full bg-[#2E1A22] text-white text-sm font-semibold">Lưu</button>
+                    <input value={dqQuestion} onChange={(e)=>setDqQuestion(e.target.value)} placeholder={(t.admin as any).questionsView.placeholder} className="flex-1 min-w-[200px] h-10 rounded-xl border border-[#FCE8EC] px-3 text-sm" />
+                    <button onClick={async()=>{ if(!dqQuestion.trim()) return toast((t.admin as any).questionsView.placeholder, "error"); await fetch("/api/admin/daily-questions",{method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({date:dqDate, question:dqQuestion})}); setDqQuestion(""); const r=await fetch("/api/admin/daily-questions").then(x=>x.json()); setDqList(r.questions??[]); toast("Đã lưu", "success"); }} className="px-5 h-10 rounded-full bg-[#2E1A22] text-white text-sm font-semibold">{(t.admin as any).questionsView.save}</button>
                   </div>
                 </div>
                 <div className="flex-1 min-h-0 overflow-y-auto space-y-2 pr-1">
@@ -290,7 +298,7 @@ export default function AdminClient({ isAdmin }: { isAdmin: boolean }) {
                     <div key={q.id} className="flex items-center gap-3 rounded-2xl border border-[#FCE8EC] bg-white p-3">
                       <span className="text-xs font-mono bg-[#FFF0F3] border border-[#FCE8EC] px-2 py-1 rounded-full">{q.date}</span>
                       <span className="flex-1 text-sm">{q.question}</span>
-                      <button onClick={async()=>{ if(!confirm("Xóa?"))return; await fetch(`/api/admin/daily-questions?date=${q.date}`,{method:"DELETE"}); setDqList(prev=>prev.filter(x=>x.id!==q.id));}} className="text-xs text-red-600 underline">Xóa</button>
+                      <button onClick={async()=>{ const ok = await confirm({ title: (t.admin as any).questionsView.deleteConfirm, variant: "danger", confirmText: (t.admin as any).questionsView.delete, cancelText: t.common.cancel }); if(!ok) return; await fetch(`/api/admin/daily-questions?date=${q.date}`,{method:"DELETE"}); setDqList(prev=>prev.filter(x=>x.id!==q.id)); toast("Đã xóa", "success");}} className="text-xs text-red-600 underline">{(t.admin as any).questionsView.delete}</button>
                     </div>
                   ))}
                 </div>

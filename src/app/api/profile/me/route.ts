@@ -117,6 +117,8 @@ export async function DELETE() {
   const session = await auth();
   const userId = (session?.user as any)?.id as string | undefined;
   if (!userId) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  const me = await prisma.user.findUnique({ where: { id: userId }, select: { isAdmin: true } });
+  if (me?.isAdmin) return NextResponse.json({ error: "ADMIN_CANNOT_DELETE", message: "Admin không thể xóa tài khoản" }, { status: 403 });
   await prisma.user.update({ where: { id: userId }, data: { status: "DELETED" } });
   return NextResponse.json({ status: "DELETED" });
 }

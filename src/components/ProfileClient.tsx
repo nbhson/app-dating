@@ -2,9 +2,11 @@
 import { useState } from "react";
 import { signOut } from "next-auth/react";
 import { useI18n } from "@/lib/i18n/context";
+import { usePopup } from "@/components/ui/PopupProvider";
 
 export default function ProfileClient({ user }: { user: any }) {
   const { t, trans, locale } = useI18n();
+  const { toast, confirm, prompt } = usePopup();
   const promptQs = (t.profile.promptQuestions as unknown as string[]) ?? [];
   const [form, setForm] = useState({
     bio: user.profile?.bio ?? "",
@@ -36,6 +38,7 @@ export default function ProfileClient({ user }: { user: any }) {
   const [stamps, setStamps] = useState((user as any).stamps ?? 3);
   const [verifyStatus, setVerifyStatus] = useState((user as any).verificationStatus ?? "NONE");
   const isVerified = (user as any).isVerified ?? false;
+  const isAdmin = (user as any).isAdmin ?? false;
   const [coords, setCoords] = useState<{ lat:number; lng:number } | null>(
     user.profile?.latitude != null && user.profile?.longitude != null ? { lat: user.profile.latitude, lng: user.profile.longitude } : null
   );
@@ -74,7 +77,7 @@ export default function ProfileClient({ user }: { user: any }) {
       await fetch("/api/daily-answer", { method: "POST", headers: { "Content-Type":"application/json" }, body: JSON.stringify({ answer: dailyA }) });
     }
     setSaving(false);
-    alert(t.profile.saved);
+    toast(t.profile.saved, "success");
   }
 
   async function upload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -84,16 +87,16 @@ export default function ProfileClient({ user }: { user: any }) {
     fd.append("file", f);
     const res = await fetch("/api/profile/photos", { method: "POST", body: fd });
     const data = await res.json();
-    if (res.ok) setPhotos((p) => [...p, data.photo]);
-    else alert(data.error ?? t.profile.uploadError);
+    if (res.ok) { setPhotos((p) => [...p, data.photo]); toast("Đã tải ảnh", "success"); }
+    else toast(data.error ?? t.profile.uploadError, "error");
   }
 
   async function addPrompt() {
     if (!newPromptA.trim() || prompts.length >=3) return;
     const res = await fetch("/api/prompts", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ question: newPromptQ, answer: newPromptA }) });
     const d = await res.json();
-    if (res.ok) { setPrompts((p)=>[...p, d.answer]); setNewPromptA(""); }
-    else alert(d.error);
+    if (res.ok) { setPrompts((p)=>[...p, d.answer]); setNewPromptA(""); toast("Đã thêm", "success"); }
+    else toast(d.error, "error");
   }
 
   const inputClass = "w-full h-10 md:h-11 rounded-2xl border border-[#FCE8EC] px-3 md:px-4 bg-white/70 focus:bg-white focus:border-[#FF8FA3] outline-none text-sm transition placeholder:text-[#B08A95]";
@@ -118,8 +121,9 @@ export default function ProfileClient({ user }: { user: any }) {
                 onClick={async () => {
                   const r = await fetch(`/api/profile/photos/${p.id}`, { method: "DELETE" });
                   const d = await r.json();
-                  if (!r.ok) return alert(d.error);
+                  if (!r.ok) return toast(d.error, "error");
                   setPhotos((prev) => prev.filter((x) => x.id !== p.id));
+                  toast("Đã xóa ảnh", "success");
                 }}
                 className="absolute top-2 right-2 w-7 h-7 rounded-full bg-[#2E1A22]/70 backdrop-blur text-white text-xs grid place-items-center hover:bg-[#2E1A22] transition"
               >
@@ -140,14 +144,14 @@ export default function ProfileClient({ user }: { user: any }) {
           {voiceUrl ? (
             <>
               <audio controls src={voiceUrl} className="flex-1 h-8 rounded-full" />
-              <button onClick={async()=>{ await fetch("/api/profile/voice",{method:"DELETE"}); setVoiceUrl(null);}} className="text-xs font-medium underline text-[#8E6B75]">{t.profile.deleteVoice}</button>
+              <button onClick={async()=>{ await fetch("/api/profile/voice",{method:"DELETE"}); setVoiceUrl(null); toast("Đã xóa voice", "success");}} className="text-xs font-medium underline text-[#8E6B75]">{t.profile.deleteVoice}</button>
             </>
           ) : (
             <label className="ml-auto text-xs font-semibold border border-[#FCE8EC] rounded-full px-4 py-2 bg-white hover:bg-[#FFF0F3] cursor-pointer transition">
               <input type="file" accept="audio/*" className="hidden" onChange={async(e)=>{
                 const f=e.target.files?.[0]; if(!f) return;
                 const fd=new FormData(); fd.append("file", f); fd.append("duration","15");
-                const r=await fetch("/api/profile/voice",{method:"POST", body:fd}); const d=await r.json(); if(r.ok) setVoiceUrl(d.url);
+                const r=await fetch("/api/profile/voice",{method:"POST", body:fd}); const d=await r.json(); if(r.ok) { setVoiceUrl(d.url); toast("Đã tải voice", "success"); } else toast(d.error, "error");
               }} />
               {t.profile.uploadVoice}
             </label>
@@ -177,7 +181,7 @@ export default function ProfileClient({ user }: { user: any }) {
               <div className="text-[11px] font-mono tracking-[0.12em] uppercase text-[#FF4D6D] font-semibold">{p.question}</div>
               <div className="text-sm font-display mt-1.5 leading-snug">{p.answer}</div>
             </div>
-            <button onClick={async()=>{ await fetch(`/api/prompts?id=${p.id}`,{method:"DELETE"}); setPrompts(prev=>prev.filter((x:any)=>x.id!==p.id));}} className="text-xs font-medium underline text-[#8E6B75] shrink-0 hover:text-[#FF4D6D]">{t.profile.deletePromptBtn}</button>
+            <button onClick={async()=>{ await fetch(`/api/prompts?id=${p.id}`,{method:"DELETE"}); setPrompts(prev=>prev.filter((x:any)=>x.id!==p.id)); toast("Đã xóa", "success");}} className="text-xs font-medium underline text-[#8E6B75] shrink-0 hover:text-[#FF4D6D]">{t.profile.deletePromptBtn}</button>
           </div>
         ))}
         {prompts.length < 3 && (
@@ -210,56 +214,53 @@ export default function ProfileClient({ user }: { user: any }) {
 
       {/* Extended fields */}
       <div className={card}>
-        <h2 className="font-semibold flex items-center gap-2">Thông tin mở rộng <span className="text-xs font-mono bg-[#FFF0F3] border border-[#FCE8EC] px-2 py-1 rounded-full text-[#8E6B75]">Mới</span></h2>
+        <h2 className="font-semibold flex items-center gap-2">{(t.profile as any).extendedInfo ?? "Thông tin mở rộng"} <span className="text-xs font-mono bg-[#FFF0F3] border border-[#FCE8EC] px-2 py-1 rounded-full text-[#8E6B75]">{(t.profile as any).extendedBadge ?? "Mới"}</span></h2>
         <div className="grid grid-cols-2 gap-3">
-          <input value={extra.height} onChange={(e)=>setExtra({...extra, height:e.target.value})} placeholder="Chiều cao (cm)" type="number" className={inputClass} />
-          <input value={extra.languages} onChange={(e)=>setExtra({...extra, languages:e.target.value})} placeholder="Ngôn ngữ (VD: vi, en)" className={inputClass} />
-          <input value={extra.religion} onChange={(e)=>setExtra({...extra, religion:e.target.value})} placeholder="Tôn giáo" className={inputClass} />
-          <input value={extra.wantKids} onChange={(e)=>setExtra({...extra, wantKids:e.target.value})} placeholder="Muốn có con? (Có/Không/Chưa biết)" className={inputClass} />
+          <input value={extra.height} onChange={(e)=>setExtra({...extra, height:e.target.value})} placeholder={(t.profile as any).height ?? "Chiều cao (cm)"} type="number" className={inputClass} />
+          <input value={extra.languages} onChange={(e)=>setExtra({...extra, languages:e.target.value})} placeholder={(t.profile as any).languages ?? "Ngôn ngữ"} className={inputClass} />
+          <input value={extra.religion} onChange={(e)=>setExtra({...extra, religion:e.target.value})} placeholder={(t.profile as any).religion ?? "Tôn giáo"} className={inputClass} />
+          <input value={extra.wantKids} onChange={(e)=>setExtra({...extra, wantKids:e.target.value})} placeholder={(t.profile as any).wantKidsPlaceholder ?? "Muốn có con?"} className={inputClass} />
           <select value={extra.smoking} onChange={(e)=>setExtra({...extra, smoking:e.target.value})} className={inputClass}>
-            <option value="">Hút thuốc: chưa chọn</option>
-            <option value="NEVER">Không bao giờ</option>
-            <option value="SOCIAL">Xã giao</option>
-            <option value="OFTEN">Thường xuyên</option>
+            <option value="">{(t.profile as any).smokingUnset ?? "Hút thuốc: chưa chọn"}</option>
+            <option value="NEVER">{(t.profile as any).smokingNever ?? "Không bao giờ"}</option>
+            <option value="SOCIAL">{(t.profile as any).smokingSocial ?? "Xã giao"}</option>
+            <option value="OFTEN">{(t.profile as any).smokingOften ?? "Thường xuyên"}</option>
           </select>
           <select value={extra.drinking} onChange={(e)=>setExtra({...extra, drinking:e.target.value})} className={inputClass}>
-            <option value="">Uống rượu: chưa chọn</option>
-            <option value="NEVER">Không</option>
-            <option value="SOCIAL">Xã giao</option>
-            <option value="OFTEN">Thường xuyên</option>
+            <option value="">{(t.profile as any).drinkingUnset ?? "Uống rượu: chưa chọn"}</option>
+            <option value="NEVER">{(t.profile as any).drinkingNever ?? "Không"}</option>
+            <option value="SOCIAL">{(t.profile as any).drinkingSocial ?? "Xã giao"}</option>
+            <option value="OFTEN">{(t.profile as any).drinkingOften ?? "Thường xuyên"}</option>
           </select>
         </div>
         <label className="flex items-center gap-3 p-3 rounded-2xl border border-[#FCE8EC] bg-white cursor-pointer">
           <input type="checkbox" checked={isIncognito} onChange={(e)=>setIsIncognito(e.target.checked)} className="w-4 h-4 accent-[#FF4D6D]" />
           <div>
-            <div className="text-sm font-semibold">Chế độ ẩn danh</div>
-            <div className="text-xs text-[#8E6B75]">Ẩn khỏi khám phá, không bị nhìn thấy khi bật</div>
+            <div className="text-sm font-semibold">{(t.profile as any).incognito ?? "Chế độ ẩn danh"}</div>
+            <div className="text-xs text-[#8E6B75]">{(t.profile as any).incognitoDesc ?? "Ẩn khỏi khám phá"}</div>
           </div>
         </label>
         <div className="rounded-2xl border border-[#FCE8EC] bg-[#FFF0F3]/50 p-3 flex items-center gap-3">
           <span className="w-8 h-8 rounded-full gradient-primary grid place-items-center text-white text-xs">✦</span>
           <div className="flex-1">
-            <div className="text-sm font-semibold">Tem ưu tiên: {stamps} tem</div>
-            <div className="text-xs text-[#8E6B75]">Gửi bưu thiếp ưu tiên nổi bật hơn (reset hàng tuần)</div>
+            <div className="text-sm font-semibold">{trans("profile.stamps" as any, { count: stamps } as any)}</div>
+            <div className="text-xs text-[#8E6B75]">{(t.profile as any).stampsDesc ?? "Gửi bưu thiếp ưu tiên"}</div>
           </div>
         </div>
         <div className="rounded-2xl border border-[#FCE8EC] bg-white p-4 flex items-center gap-3">
           <span className={`w-8 h-8 rounded-full grid place-items-center text-xs ${isVerified ? 'bg-emerald-500 text-white' : 'bg-[#FFF0F3] border border-[#FCE8EC] text-[#8E6B75]'}`}>{isVerified ? '✓' : '?'}</span>
           <div className="flex-1">
-            <div className="text-sm font-semibold flex items-center gap-2">Xác minh {isVerified && <span className="text-emerald-600 text-xs">✓ Đã tick xanh</span>}</div>
-            <div className="text-xs text-[#8E6B75]">Trạng thái: {verifyStatus}</div>
+            <div className="text-sm font-semibold flex items-center gap-2">{(t.profile as any).verification ?? "Xác minh"} {isVerified && <span className="text-emerald-600 text-xs">{(t.profile as any).verified ?? "✓ Đã tick xanh"}</span>}</div>
+            <div className="text-xs text-[#8E6B75]">{trans("profile.verificationStatus" as any, { status: verifyStatus } as any)}</div>
           </div>
           {!isVerified && (
-            <label className="text-xs font-semibold border border-[#FCE8EC] rounded-full px-4 py-2 bg-white hover:bg-[#FFF0F3] cursor-pointer">
+            <label className="text-xs font-semibold border border-[#FCE8EC] rounded-full px-4 py-2 bg-white hover:bg-[#FFF0F3] cursor-pointer transition">
               <input type="file" accept="image/*" className="hidden" onChange={async(e)=>{
                 const f=e.target.files?.[0]; if(!f) return;
-                const fd=new FormData(); fd.append("file", f);
-                // try upload verification
-                const r=await fetch("/api/verification", {method:"POST", body: JSON.stringify({photoUrl: URL.createObjectURL(f)})}); // fallback JSON
-                // actually try FormData path by reading file as base? For demo use /api/verification with JSON
-                if(r.ok) { alert("Đã gửi yêu cầu xác minh"); setVerifyStatus("PENDING"); } else { const d=await r.json(); alert(d.error); }
+                const r=await fetch("/api/verification", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({photoUrl: URL.createObjectURL(f)})});
+                if(r.ok) { toast((t.profile as any).verificationSubmitted ?? "Đã gửi yêu cầu xác minh", "success"); setVerifyStatus("PENDING"); } else { const d=await r.json(); toast(d.error, "error"); }
               }} />
-              Gửi xác minh
+              {(t.profile as any).sendVerification ?? "Gửi xác minh"}
             </label>
           )}
         </div>
@@ -298,10 +299,10 @@ export default function ProfileClient({ user }: { user: any }) {
           <input type="range" min={5} max={200} step={5} value={pref.maxDistance} onChange={(e)=>setPref({...pref, maxDistance:Number(e.target.value)})} className="w-full accent-[#FF4D6D]" />
         </label>
         <div className="space-y-2 pt-2 border-t border-[#FCE8EC]/60">
-          <div className="text-xs font-semibold text-[#8E6B75]">Bộ lọc nâng cao</div>
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={pref.verifiedOnly} onChange={(e)=>setPref({...pref, verifiedOnly:e.target.checked})} className="accent-[#FF4D6D]" /> Chỉ hiện người đã xác minh</label>
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={pref.hasVoiceOnly} onChange={(e)=>setPref({...pref, hasVoiceOnly:e.target.checked})} className="accent-[#FF4D6D]" /> Chỉ hiện người có voice</label>
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={pref.hasPhotoOnly} onChange={(e)=>setPref({...pref, hasPhotoOnly:e.target.checked})} className="accent-[#FF4D6D]" /> Chỉ hiện người có ảnh</label>
+          <div className="text-xs font-semibold text-[#8E6B75]">{(t.profile as any).advancedFilters ?? "Bộ lọc nâng cao"}</div>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={pref.verifiedOnly} onChange={(e)=>setPref({...pref, verifiedOnly:e.target.checked})} className="accent-[#FF4D6D]" /> {(t.profile as any).verifiedOnly ?? "Chỉ hiện người đã xác minh"}</label>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={pref.hasVoiceOnly} onChange={(e)=>setPref({...pref, hasVoiceOnly:e.target.checked})} className="accent-[#FF4D6D]" /> {(t.profile as any).hasVoiceOnly ?? "Chỉ hiện người có voice"}</label>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={pref.hasPhotoOnly} onChange={(e)=>setPref({...pref, hasPhotoOnly:e.target.checked})} className="accent-[#FF4D6D]" /> {(t.profile as any).hasPhotoOnly ?? "Chỉ hiện người có ảnh"}</label>
         </div>
       </div>
 
@@ -312,21 +313,37 @@ export default function ProfileClient({ user }: { user: any }) {
       <div className="glass rounded-[24px] p-6 space-y-3 border border-red-100">
         <h2 className="font-semibold text-[#8E2C3A] flex items-center gap-2">{t.profile.dangerZone} <span className="text-xs font-mono bg-red-50 border border-red-200 px-2 py-1 rounded-full">{t.profile.dangerBadge}</span></h2>
         <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-xs text-red-700 leading-relaxed">{t.profile.dangerDesc}</div>
+        {isAdmin && (
+          <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800 flex items-center gap-2">
+            <span className="w-6 h-6 rounded-full bg-amber-500 text-white grid place-items-center text-[11px]">⚠</span>
+            <span>Tài khoản Admin không thể xóa — hãy liên hệ owner hoặc hạ quyền admin trước.</span>
+          </div>
+        )}
         <button
+          disabled={isAdmin}
           onClick={async () => {
-            if (!confirm(t.profile.deleteConfirm)) return;
-            const typed = prompt(trans("profile.deleteAccountPrompt", { email: user.email }));
+            if (isAdmin) { toast("Admin không thể xóa tài khoản", "error"); return; }
+            const ok = await confirm({ title: t.profile.deleteConfirm, variant: "danger", confirmText: t.profile.deleteAccount, cancelText: t.common.cancel });
+            if (!ok) return;
+            const typed = await prompt({ title: trans("profile.deleteAccountPrompt", { email: user.email }), placeholder: user.email, confirmText: t.common.confirm, cancelText: t.common.cancel });
             if (typed === null) return;
             if (typed.trim().toLowerCase() !== user.email.toLowerCase()) {
-              alert(t.profile.deleteMismatch);
+              toast(t.profile.deleteMismatch, "error");
               return;
             }
-            await fetch("/api/profile/me", { method: "DELETE" });
+            const res = await fetch("/api/profile/me", { method: "DELETE" });
+            if (!res.ok) {
+              const d = await res.json().catch(()=>({}));
+              toast(d.error === "ADMIN_CANNOT_DELETE" ? "Admin không thể xóa tài khoản" : d.error || "Xóa thất bại", "error");
+              return;
+            }
+            toast("Tài khoản đã xóa", "success");
             await signOut({ callbackUrl: "/" });
           }}
-          className="w-full h-11 rounded-full border border-red-200 text-red-600 bg-red-50 hover:bg-red-100 font-semibold text-sm transition"
+          className={`w-full h-11 rounded-full border font-semibold text-sm transition ${isAdmin ? "border-zinc-200 text-zinc-400 bg-zinc-100 cursor-not-allowed" : "border-red-200 text-red-600 bg-red-50 hover:bg-red-100"}`}
+          title={isAdmin ? "Admin không thể xóa tài khoản" : undefined}
         >
-          {t.profile.deleteAccount}
+          {t.profile.deleteAccount} {isAdmin && "(Đã vô hiệu hóa)"}
         </button>
         <div className="text-[11px] font-mono text-[#B08A95] text-center">
           {trans("profile.accountMeta", { email: user.email, id: user.id.slice(0, 8) })}

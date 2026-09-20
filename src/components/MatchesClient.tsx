@@ -2,9 +2,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n/context";
+import { usePopup } from "@/components/ui/PopupProvider";
 
 export default function MatchesClient() {
   const { t, trans, locale } = useI18n();
+  const { toast } = usePopup();
   const [matches, setMatches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"all" | "new" | "chatting" | "liked" | "favorites">("all");
@@ -54,8 +56,8 @@ export default function MatchesClient() {
           ["all", t.matches.tabsAll],
           ["new", t.matches.tabsNew],
           ["chatting", t.matches.tabsChatting],
-          ["liked", "Ai thích mình"],
-          ["favorites", "Đã lưu ♥"],
+          ["liked", (t.matches as any).tabsLiked ?? "Ai thích mình"],
+          ["favorites", (t.matches as any).tabsFavorites ?? "Đã lưu ♥"],
         ].map(([v, l]) => (
           <button key={v} onClick={() => setTab(v as any)} className={`px-4 py-2 rounded-full text-xs font-semibold border transition-all whitespace-nowrap ${tab === v ? "bg-[#2E1A22] text-white border-[#2E1A22] shadow-[0_4px_12px_rgba(46,26,34,0.18)]" : "bg-white border-[#FCE8EC] text-[#8E6B75] hover:border-[#FFD6DE] hover:text-[#2E1A22]"}`}>
             {l}
@@ -65,7 +67,7 @@ export default function MatchesClient() {
 
       {tab==="liked" ? (
         likesLoading ? <div className="p-8 text-sm animate-pulse">Đang tải...</div> :
-        liked.length===0 ? <div className="p-10 text-center text-sm text-[#8E6B75]">Chưa có ai thích bạn — hãy đi khám phá!</div> :
+        liked.length===0 ? <div className="p-10 text-center text-sm text-[#8E6B75]">{(t.matches as any).noLiked ?? "Chưa có ai thích bạn — hãy đi khám phá!"}</div> :
         <div className="divide-y divide-[#FCE8EC]/60 flex-1 min-h-0 overflow-y-auto">
           {liked.map((l:any)=>(
             <div key={l.id} className="flex items-center gap-3.5 p-4 hover:bg-white/70">
@@ -76,21 +78,21 @@ export default function MatchesClient() {
               </div>
               <button onClick={async()=>{
                 const r=await fetch("/api/discover/like",{method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({toUserId:l.user.id, comment: `Cảm ơn vì “${l.comment.slice(0,30)}” — mình cũng thích bạn`, anchor:l.anchor})});
-                const d=await r.json(); if(d.status?.includes("MATCH")) alert("Đã ghép đôi ♥"); else alert("Đã gửi bưu thiếp");
+                const d=await r.json(); if(d.status?.includes("MATCH")) toast("Đã ghép đôi ♥", "success"); else if(r.ok) toast("Đã gửi bưu thiếp", "success"); else toast(d.error, "error");
                 setTab("all");
-              }} className="px-3 py-1.5 rounded-full bg-[#2E1A22] text-white text-xs font-semibold">Đáp lại</button>
+              }} className="px-3 py-1.5 rounded-full bg-[#2E1A22] text-white text-xs font-semibold">{(t.matches as any).reply ?? "Đáp lại"}</button>
             </div>
           ))}
         </div>
       ) : tab==="favorites" ? (
         likesLoading ? <div className="p-8 text-sm animate-pulse">Đang tải...</div> :
-        favorites.length===0 ? <div className="p-10 text-center text-sm text-[#8E6B75]">Chưa lưu ai</div> :
+        favorites.length===0 ? <div className="p-10 text-center text-sm text-[#8E6B75]">{(t.matches as any).noFavorites ?? "Chưa lưu ai"}</div> :
         <div className="divide-y divide-[#FCE8EC]/60 flex-1 min-h-0 overflow-y-auto">
           {favorites.map((f:any)=>(
             <div key={f.id} className="flex items-center gap-3.5 p-4 hover:bg-white/70">
               <div className="w-12 h-12 rounded-full overflow-hidden bg-[#FFE8EC] border-2 border-white">{f.user.photo ? <img src={f.user.photo} alt="" className="w-full h-full object-cover"/> : <div className="w-full h-full grid place-items-center text-[#FF8FA3]">♥</div>}</div>
               <div className="flex-1 min-w-0"><div className="font-semibold text-sm">{f.user.name}</div><div className="text-xs text-[#8E6B75] truncate">{f.user.bio ?? ""}</div></div>
-              <button onClick={async()=>{ await fetch(`/api/favorites?targetId=${f.user.id}`,{method:"DELETE"}); setFavorites(prev=>prev.filter((x:any)=>x.user.id!==f.user.id));}} className="text-xs underline">Bỏ lưu</button>
+              <button onClick={async()=>{ await fetch(`/api/favorites?targetId=${f.user.id}`,{method:"DELETE"}); setFavorites(prev=>prev.filter((x:any)=>x.user.id!==f.user.id)); toast("Đã bỏ lưu", "success");}} className="text-xs underline">{(t.matches as any).removeFavorite ?? "Bỏ lưu"}</button>
             </div>
           ))}
         </div>

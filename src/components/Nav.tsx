@@ -5,20 +5,19 @@ import { useEffect, useState, useMemo } from "react";
 import { signOut } from "next-auth/react";
 import { useI18n } from "@/lib/i18n/context";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import { usePopup } from "@/components/ui/PopupProvider";
 
 export default function Nav() {
   const pathname = usePathname();
   const { t, trans } = useI18n();
+  const { showAlert, toast } = usePopup();
   const [isAdmin, setIsAdmin] = useState(false);
-  const items = useMemo(() => {
-    const base = [
-      { href: "/discover", label: t.nav.discover, sub: t.nav.discoverSub, icon: "♥", activeIcon: "♥" },
-      { href: "/matches", label: t.nav.inbox, sub: t.nav.inboxSub, icon: "✉", activeIcon: "✉" },
-      { href: "/profile", label: t.nav.profile, sub: t.nav.profileSub, icon: "◐", activeIcon: "◉" },
-    ];
-    if (isAdmin) base.push({ href: "/admin", label: (t as any).nav?.admin ?? "Admin", sub: (t as any).nav?.adminSub ?? "Quản trị", icon: "⚙", activeIcon: "⚙" });
-    return base;
-  }, [t, isAdmin]);
+  const items = useMemo(() => [
+    { href: "/discover", label: t.nav.discover, sub: t.nav.discoverSub, icon: "♥", activeIcon: "♥" },
+    { href: "/matches", label: t.nav.inbox, sub: t.nav.inboxSub, icon: "✉", activeIcon: "✉" },
+    { href: "/profile", label: t.nav.profile, sub: t.nav.profileSub, icon: "◐", activeIcon: "◉" },
+  ], [t]);
+  const adminItem = useMemo(() => isAdmin ? { href: "/admin", label: (t as any).nav?.admin ?? "Admin", sub: (t as any).nav?.adminSub ?? "Quản trị", icon: "⬢", activeIcon: "⬢" } : null, [t, isAdmin]);
   const [unreadTotal, setUnreadTotal] = useState(0);
   const [unreadByMatch, setUnreadByMatch] = useState(0);
   const [notifUnread, setNotifUnread] = useState(0);
@@ -106,10 +105,38 @@ export default function Nav() {
               );
             })}
             {/* notifications quick access */}
-            <button onClick={async()=>{ const r=await fetch("/api/notifications"); const d=await r.json(); alert((d.notifications??[]).map((n:any)=>`${n.title}: ${n.body ?? ''}`).join('\n') || 'Không có thông báo'); fetch("/api/notifications",{method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify({markAll:true})}).then(()=>setNotifUnread(0));}} className="px-4 py-3 rounded-[20px] flex items-center gap-3.5 bg-white/60 border border-white/40 hover:bg-white text-[#2E1A22] transition">
+            <button onClick={async()=>{ const r=await fetch("/api/notifications"); const d=await r.json(); const list=(d.notifications??[]) as any[]; if(list.length===0){ showAlert({ title: (t as any).notifications?.title ?? "Thông báo", description: (t as any).notifications?.empty ?? "Không có thông báo", icon: "🔔" }); } else { const body = list.slice(0,5).map((n:any)=>`• ${n.title}${n.body?`: ${n.body}`:""}`).join('\n') + (list.length>5?`\n+ ${list.length-5} nữa`:""); showAlert({ title: `${(t as any).notifications?.title ?? "Thông báo"} (${list.length})`, description: body, icon: "🔔" }); } fetch("/api/notifications",{method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify({markAll:true})}).then(()=>setNotifUnread(0));}} className="px-4 py-3 rounded-[20px] flex items-center gap-3.5 bg-white/60 border border-white/40 hover:bg-white text-[#2E1A22] transition">
               <span className="w-9 h-9 rounded-full bg-[#FFF0F3] border border-[#FCE8EC] grid place-items-center text-[13px] relative">🔔 {notifUnread>0 && <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-[#FF4D6D] text-white text-[9px] font-bold grid place-items-center border-2 border-white">{notifUnread}</span>}</span>
-              <div className="text-left"><div className="text-[13px] font-semibold">Thông báo</div><div className="text-[11px] font-mono text-[#B08A95]">{notifUnread>0 ? `${notifUnread} mới` : 'Không có mới'}</div></div>
+              <div className="text-left"><div className="text-[13px] font-semibold">{(t.nav as any).notifications ?? (t as any).notifications?.title ?? "Thông báo"}</div><div className="text-[11px] font-mono text-[#B08A95]">{notifUnread>0 ? trans("nav.newNotifications" as any, {count: notifUnread}) || `${notifUnread} mới` : (t.nav as any).noNewNotifications ?? "Không có mới"}</div></div>
             </button>
+            {/* Admin distinct section */}
+            {adminItem && (
+              <div className="mt-1 pt-4 border-t border-[#FCE8EC]/70">
+                <div className="text-[10px] font-mono tracking-[0.16em] uppercase text-[#B08A95] px-2 mb-2 flex items-center gap-1.5">
+                  <span className="w-1 h-1 rounded-full bg-amber-500" /> {(t as any).admin?.tabs?.moderation ?? "Quản trị viên"} · admin
+                </div>
+                {(() => {
+                  const active = pathname.startsWith(adminItem.href);
+                  return (
+                    <Link
+                      href={adminItem.href}
+                      className={`group flex items-center gap-3.5 px-4 py-3.5 rounded-[20px] border transition-all relative overflow-hidden ${active ? "bg-[#1A1A1E] text-white border-[#1A1A1E] shadow-[0_8px_20px_rgba(26,26,30,0.22)]" : "bg-amber-50/80 border-amber-200/70 hover:bg-amber-50 hover:border-amber-300 text-[#7A5A2E] shadow-[0_4px_12px_rgba(245,158,11,0.08)]"}`}
+                    >
+                      <span className={`w-9 h-9 rounded-full grid place-items-center text-[13px] shrink-0 border ${active ? "bg-white/15 text-white border-white/15" : "bg-white border-amber-200 text-amber-600"}`}>{adminItem.icon}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[13px] font-semibold leading-none flex items-center gap-2">
+                          {adminItem.label}
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold border ${active ? "bg-amber-500 text-white border-amber-500" : "bg-[#1A1A1E] text-white border-[#1A1A1E]"}`}>ADMIN</span>
+                        </div>
+                        <div className={`text-[11px] font-mono tracking-wide ${active ? "text-white/60" : "text-[#B08A95]"}`}>{adminItem.sub}</div>
+                      </div>
+                      {active ? <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse-soft" /> : <span className="text-[12px] opacity-40 group-hover:translate-x-0.5 transition">→</span>}
+                    </Link>
+                  );
+                })()}
+                <div className="text-[11px] text-[#8E6B75] leading-relaxed mt-2 px-2 bg-amber-50/60 border border-amber-100 rounded-xl p-2.5">Khu vực riêng biệt — không lẫn với Hòm thư/Hồ sơ. Chỉ admin thấy.</div>
+              </div>
+            )}
           </nav>
 
           <div className="mt-auto space-y-3 relative z-10">
@@ -142,6 +169,17 @@ export default function Nav() {
 
       {/* Mobile bottom - floating pill glass */}
       <nav className="md:hidden fixed bottom-4 inset-x-4 z-50 flex flex-col items-center gap-2 pointer-events-none">
+        {adminItem && (
+          <div className="pointer-events-auto">
+            <Link
+              href={adminItem.href}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold border shadow-[0_8px_20px_rgba(0,0,0,0.12)] ${pathname.startsWith(adminItem.href) ? "bg-[#1A1A1E] text-white border-[#1A1A1E]" : "bg-amber-400 text-[#1A1A1E] border-amber-300"}`}
+            >
+              <span className="w-6 h-6 rounded-full bg-white/20 grid place-items-center text-[12px]">⬢</span>
+              {adminItem.label} <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-white/20 border border-white/20">ADMIN</span>
+            </Link>
+          </div>
+        )}
         <div className="pointer-events-auto flex items-center gap-1.5 p-1 rounded-full glass-strong shadow-[0_8px_20px_rgba(46,26,34,0.12)] border border-white/70">
           <LanguageSwitcher variant="compact" />
           <button onClick={() => signOut({ callbackUrl: "/" })} className="h-8 px-3.5 rounded-full bg-white border border-[#FCE8EC] text-xs font-semibold text-[#2E1A22] hover:bg-[#FFF0F3] flex items-center gap-1">

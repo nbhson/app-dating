@@ -2,9 +2,11 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n/context";
+import { usePopup } from "@/components/ui/PopupProvider";
 
 export default function ChatClient({ matchId }: { matchId: string }) {
   const { t, trans } = useI18n();
+  const { toast, confirm } = usePopup();
   const [messages, setMessages] = useState<any[]>([]);
   const [other, setOther] = useState<any>(null);
   const [input, setInput] = useState("");
@@ -42,7 +44,7 @@ export default function ChatClient({ matchId }: { matchId: string }) {
     e.preventDefault();
     if (!input.trim()) return;
     if (slowInfo && slowInfo.remaining <= 0) {
-      alert(t.chat.slowLimit);
+      toast(t.chat.slowLimit, "error");
       return;
     }
     const content = input;
@@ -55,7 +57,8 @@ export default function ChatClient({ matchId }: { matchId: string }) {
     });
     if (!res.ok) {
       const d = await res.json();
-      if (d.error === "SLOW_LIMIT") alert(t.chat.slowLimitShort);
+      if (d.error === "SLOW_LIMIT") toast(t.chat.slowLimitShort, "error");
+      else toast(d.error || "Gửi thất bại", "error");
       load();
     } else load();
   }
@@ -86,10 +89,10 @@ export default function ChatClient({ matchId }: { matchId: string }) {
         </div>
         <div className="ml-auto flex gap-2">
           <button
-            onClick={async()=>{ if(!confirm("Hủy kết nối?")) return; const r=await fetch(`/api/matches/${matchId}/unmatch`,{method:"POST"}); if(r.ok) window.location.href="/matches";}}
+            onClick={async()=>{ const ok = await confirm({ title: (t.chat as any).unmatch ?? "Hủy ghép", description: (t.chat as any).unmatchConfirm ?? "Hủy kết nối? Tin nhắn sẽ bị ẩn.", variant: "danger", confirmText: (t.chat as any).unmatch ?? "Hủy ghép", cancelText: t.common.cancel }); if(!ok) return; const r=await fetch(`/api/matches/${matchId}/unmatch`,{method:"POST"}); if(r.ok){ toast("Đã hủy ghép", "success"); window.location.href="/matches"; } else toast("Thất bại", "error");}}
             className="text-xs font-medium border border-[#FCE8EC] rounded-full px-3 py-1.5 bg-white hover:bg-[#FFF0F3] transition"
           >
-            Hủy ghép
+            {(t.chat as any).unmatch ?? "Hủy ghép"}
           </button>
           <button
             onClick={() => setReportOpen(true)}
@@ -100,8 +103,10 @@ export default function ChatClient({ matchId }: { matchId: string }) {
           <button
             onClick={async () => {
               if (!other) return;
-              if (!confirm(trans("chat.blockConfirm", { name: other.name }))) return;
+              const ok = await confirm({ title: trans("chat.blockConfirm", { name: other.name }), variant: "danger", confirmText: t.chat.block, cancelText: t.common.cancel });
+              if (!ok) return;
               await fetch(`/api/users/${other.id}/block`, { method: "POST" });
+              toast("Đã chặn", "success");
               window.location.href = "/matches";
             }}
             className="text-xs font-medium border border-[#FCE8EC] rounded-full px-3.5 py-1.5 bg-white hover:bg-[#FFF0F3] transition"
@@ -122,11 +127,11 @@ export default function ChatClient({ matchId }: { matchId: string }) {
               body: JSON.stringify({ reason, details }),
             });
             if (res.ok) {
-              alert((t.discover as any).reportSent ?? "Đã gửi báo cáo.");
+              toast((t.discover as any).reportSent ?? "Đã gửi báo cáo.", "success");
               setReportOpen(false);
             } else {
               const d = await res.json().catch(() => ({}));
-              alert(d.error || "Báo cáo thất bại");
+              toast(d.error || "Báo cáo thất bại", "error");
             }
           }}
         />
@@ -154,25 +159,25 @@ export default function ChatClient({ matchId }: { matchId: string }) {
                   <div className="space-y-2">
                     <textarea value={editContent} onChange={(e)=>setEditContent(e.target.value)} rows={2} className="w-full rounded-xl border border-white/30 bg-white text-[#2E1A22] p-2 text-sm" />
                     <div className="flex gap-2 justify-end">
-                      <button onClick={()=>setEditingId(null)} className="text-xs px-3 py-1 rounded-full bg-white/20">Hủy</button>
+                      <button onClick={()=>setEditingId(null)} className="text-xs px-3 py-1 rounded-full bg-white/20">{(t.chat as any).editCancel ?? "Hủy"}</button>
                       <button onClick={async()=>{
                         const r=await fetch(`/api/matches/${matchId}/messages/${m.id}`,{method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify({content: editContent})});
-                        if(r.ok){ setEditingId(null); load(); } else { const d=await r.json(); alert(d.error); }
-                      }} className="text-xs px-3 py-1 rounded-full bg-white text-[#2E1A22]">Lưu</button>
+                        if(r.ok){ setEditingId(null); toast("Đã sửa", "success"); load(); } else { const d=await r.json(); toast(d.error, "error"); }
+                      }} className="text-xs px-3 py-1 rounded-full bg-white text-[#2E1A22]">{(t.chat as any).editSave ?? "Lưu"}</button>
                     </div>
                   </div>
                 ) : (
                   <>
-                    <div className={m.content.startsWith("“") ? "font-display italic" : ""}>{m.content} {m.isEdited && <span className="text-[10px] opacity-60">(đã sửa)</span>} {m.deletedAt && <span className="text-[10px] opacity-60">(đã thu hồi)</span>}</div>
+                    <div className={m.content.startsWith("“") ? "font-display italic" : ""}>{m.content} {m.isEdited && <span className="text-[10px] opacity-60">{(t.chat as any).edited ?? "(đã sửa)"}</span>} {m.deletedAt && <span className="text-[10px] opacity-60">{(t.chat as any).deleted ?? "(đã thu hồi)"}</span>}</div>
                     <div className={`text-[10px] font-mono mt-1.5 flex items-center gap-1 ${m.isMine ? "text-white/60 justify-end" : "text-[#B08A95]"}`}>
                       {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                      {m.isMine && m.read && <span className="text-[#FF8FA3]">✓✓ đã xem</span>}
-                      {m.isMine && !m.read && <span className="text-[10px]">✓✓</span>}
+                      {m.isMine && m.read && <span className="text-[#FF8FA3]">{(t.chat as any).read ?? "✓✓ đã xem"}</span>}
+                      {m.isMine && !m.read && <span className="text-[10px]">{(t.chat as any).delivered ?? "✓✓"}</span>}
                     </div>
                     {m.isMine && !m.deletedAt && (
                       <div className="hidden group-hover:flex gap-1 mt-1 justify-end">
-                        <button onClick={()=>{setEditingId(m.id); setEditContent(m.content);}} className="text-[10px] underline opacity-70 hover:opacity-100">Sửa (15p)</button>
-                        <button onClick={async()=>{ if(!confirm("Thu hồi?")) return; const r=await fetch(`/api/matches/${matchId}/messages/${m.id}`,{method:"DELETE"}); if(r.ok) load();}} className="text-[10px] underline opacity-70 hover:opacity-100">Xóa</button>
+                        <button onClick={()=>{setEditingId(m.id); setEditContent(m.content);}} className="text-[10px] underline opacity-70 hover:opacity-100">{(t.chat as any).edit ?? "Sửa (15p)"}</button>
+                        <button onClick={async()=>{ const ok = await confirm({ title: (t.chat as any).deleteConfirm ?? "Thu hồi?", variant: "danger", confirmText: (t.chat as any).delete ?? "Xóa", cancelText: t.common.cancel }); if(!ok) return; const r=await fetch(`/api/matches/${matchId}/messages/${m.id}`,{method:"DELETE"}); if(r.ok){ toast("Đã thu hồi", "success"); load(); } else toast("Thất bại", "error");}} className="text-[10px] underline opacity-70 hover:opacity-100">{(t.chat as any).delete ?? "Xóa"}</button>
                       </div>
                     )}
                   </>

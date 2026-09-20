@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n/context";
+import { usePopup } from "@/components/ui/PopupProvider";
 
 type Props = {
   initial: { profile: any; photos: any[]; preferences: any; promptAnswers?: any[] };
@@ -27,6 +28,7 @@ const intents = [
 export default function OnboardingClient({ initial }: Props) {
   const router = useRouter();
   const { t, trans } = useI18n();
+  const { toast } = usePopup();
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({
     firstName: initial.profile?.firstName ?? "",
@@ -68,8 +70,8 @@ export default function OnboardingClient({ initial }: Props) {
     setUploading(true);
     const res = await fetch("/api/profile/photos", { method: "POST", body: fd });
     const data = await res.json();
-    if (res.ok) setPhotos((p) => [...p, data.photo]);
-    else alert(data.error ?? "Upload failed");
+    if (res.ok) { setPhotos((p) => [...p, data.photo]); toast("Đã tải ảnh", "success"); }
+    else toast(data.error ?? "Upload failed", "error");
     setUploading(false);
   }
 
@@ -109,12 +111,12 @@ export default function OnboardingClient({ initial }: Props) {
     });
     if (!res.ok) {
       const d = await res.json();
-      alert(d.error ?? "Save failed");
+      toast(d.error ?? "Save failed", "error");
       setSaving(false);
       return;
     }
     if (photos.length === 0) {
-      alert("Hãy thêm ít nhất 1 ảnh");
+      toast("Hãy thêm ít nhất 1 ảnh", "error");
       setSaving(false);
       return;
     }
@@ -338,7 +340,7 @@ export default function OnboardingClient({ initial }: Props) {
                         setRecording(true);
                         setTimeout(() => rec.stop(), 15000);
                       } catch {
-                        alert("Không truy cập được micro");
+                        toast("Không truy cập được micro", "error");
                       }
                     }}
                     className="flex-1 h-10 rounded-full bg-[#C96442] text-white text-sm font-medium disabled:opacity-50"
