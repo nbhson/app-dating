@@ -2,6 +2,7 @@
 import { signIn } from "next-auth/react";
 import { useState } from "react";
 import Link from "next/link";
+import { motion } from "framer-motion";
 
 export default function LandingClient() {
   const [email, setEmail] = useState("");
@@ -16,131 +17,203 @@ export default function LandingClient() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#FDF8F4]">
-      <div className="flex-1 grid md:grid-cols-[1.1fr_0.9fr]">
-        <div className="flex flex-col p-8 md:p-12 lg:p-16 justify-between">
+    <div className="min-h-screen flex flex-col relative overflow-hidden">
+      {/* soft aura orbs behind */}
+      <div className="aura aura-peach w-[520px] h-[520px] -top-24 -left-24 opacity-40" />
+      <div className="aura aura-lavender w-[700px] h-[500px] top-0 right-0 opacity-40" />
+
+      <div className="flex-1 grid lg:grid-cols-[1.05fr_0.95fr] max-w-[1280px] mx-auto w-full relative">
+        {/* LEFT */}
+        <div className="flex flex-col p-6 sm:p-8 md:p-10 lg:p-12 xl:p-14 justify-between gap-10 relative">
+          {/* header */}
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-[#1A1A1E] flex items-center justify-center text-white font-mono text-[11px]">Lm</div>
-            <div>
-              <div className="font-display text-xl leading-none tracking-tight">Lumen</div>
-              <div className="text-[10px] font-mono tracking-[0.14em] uppercase text-[#6B6B6B]">Letters, not swipes</div>
+            <div className="w-10 h-10 rounded-2xl gradient-primary flex items-center justify-center text-white shadow-[0_8px_20px_rgba(255,77,109,0.3)]">
+              <span className="text-[18px] leading-none -mt-0.5">♥</span>
             </div>
+            <div>
+              <div className="font-display text-[20px] leading-none font-semibold tracking-tight">Lumen</div>
+              <div className="text-[10px] font-mono tracking-[0.16em] uppercase text-[#8E6B75]">Letters, not swipes</div>
+            </div>
+            <span className="ml-auto hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full glass text-[11px] font-medium text-[#8E6B75]">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#FF4D6D] animate-pulse-soft" /> 2.4k đang viết thư
+            </span>
           </div>
 
-          <div className="max-w-[520px] mx-auto w-full flex flex-col gap-8 py-12">
-            <div className="space-y-4">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[#E8DDD3] bg-[#FFFCF8] text-[11px] font-mono tracking-widest uppercase text-[#6B6B6B]">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#C96442] animate-pulse" /> Không vuốt · Chỉ đọc
-              </div>
-              <h1 className="font-display text-[42px] md:text-[52px] font-[400] tracking-[-0.03em] leading-[0.9]">
-                Tình cảm<br />
-                <span className="italic font-[300]">viết chậm.</span>
+          <div className="max-w-[560px] mx-auto w-full flex flex-col gap-8 py-2 lg:py-6">
+            {/* pill */}
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="inline-flex self-start items-center gap-2.5 px-4 py-2 rounded-full glass text-[12px] font-medium text-[#6E4A56]"
+            >
+              <span className="w-7 h-7 rounded-full gradient-primary grid place-items-center text-white text-[11px] shadow-sm">✦</span>
+              Không vuốt · Chỉ đọc · Chỉ cảm nhận
+              <span className="hidden sm:inline w-px h-4 bg-[#F3DDE2] ml-1" />
+              <span className="hidden sm:inline text-[#FF4D6D] font-semibold">Mềm mại & thật lòng</span>
+            </motion.div>
+
+            <div className="space-y-5">
+              <h1 className="font-display text-[42px] sm:text-[48px] lg:text-[56px] font-[300] tracking-[-0.04em] leading-[0.88] text-[#2E1A22]">
+                Tình cảm
+                <br />
+                <span className="font-[400] italic text-gradient">viết chậm.</span>
               </h1>
-              <p className="text-[#6B6B6B] leading-relaxed text-[15px] max-w-[44ch]">
-                Mỗi ngày 20 bưu thiếp. Mỗi bưu thiếp là một lá thư tay — ảnh, lời tự sự, và một câu hỏi chung. Không có nút thả tim trống. Muốn kết nối, bạn phải viết một dòng thật lòng.
+              <p className="text-[#8E6B75] leading-relaxed text-[15.5px] max-w-[46ch] font-[400]">
+                Mỗi ngày <span className="font-semibold text-[#2E1A22]">20 bưu thiếp</span> — như những lá thư tay ấm áp. Ảnh mờ hé mở, lời tự sự chân thành, và một câu hỏi chung để bạn bắt đầu bằng một dòng thật lòng.
               </p>
-              <div className="flex flex-wrap gap-2 text-xs">
-                <span className="px-2.5 py-1 rounded-full bg-[#1A1A1E] text-white font-mono">20 / ngày</span>
-                <span className="px-2.5 py-1 rounded-full border border-[#E8DDD3] bg-white">Kèm lời nhắn mới được thích</span>
-                <span className="px-2.5 py-1 rounded-full border border-[#E8DDD3] bg-white">Voice 15s + Prompt</span>
+              <div className="flex flex-wrap gap-2">
+                <span className="px-3.5 py-2 rounded-full gradient-primary text-white text-xs font-semibold shadow-[0_4px_16px_rgba(255,77,109,0.25)]">20 / ngày · chậm mà sâu</span>
+                <span className="px-3.5 py-2 rounded-full glass text-xs font-medium text-[#6E4A56]">Kèm lời nhắn mới được thích</span>
+                <span className="px-3.5 py-2 rounded-full glass text-xs font-medium text-[#6E4A56] flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[#FF4D6D] animate-pulse" /> Voice 15s</span>
               </div>
             </div>
 
-            <div className="space-y-3">
-              <button
+            <div className="space-y-3.5">
+              <motion.button
+                whileHover={{ y: -1 }}
+                whileTap={{ scale: 0.99 }}
                 onClick={() => signIn("google", { callbackUrl: "/discover" })}
-                className="w-full h-12 rounded-full border border-[#E8DDD3] bg-white hover:bg-[#F2EDE8] flex items-center justify-center gap-3 font-medium text-sm transition"
+                className="w-full h-[52px] rounded-full glass-strong hover:shadow-[0_8px_24px_rgba(46,26,34,0.08)] flex items-center justify-center gap-3 font-medium text-[14px] transition text-[#2E1A22]"
               >
-                <span className="w-5 h-5 rounded-full bg-[#4285F4] text-white grid place-items-center text-[10px] font-bold">G</span>
+                <span className="w-6 h-6 rounded-full bg-white border border-[#F3DDE2] grid place-items-center shadow-sm">
+                  <span className="w-3 h-3 rounded-full bg-[conic-gradient(from_0deg,#4285F4_0_25%,#EA4335_25%_50%,#FBBC05_50%_75%,#34A853_75%_100%)]" />
+                </span>
                 Tiếp tục với Google
-              </button>
-              <button
+              </motion.button>
+              <motion.button
+                whileHover={{ y: -1 }}
+                whileTap={{ scale: 0.99 }}
                 onClick={() => signIn("apple", { callbackUrl: "/discover" })}
-                className="w-full h-12 rounded-full bg-[#1A1A1E] text-white hover:bg-black flex items-center justify-center gap-3 font-medium text-sm transition"
+                className="w-full h-[52px] rounded-full bg-[#2E1A22] text-white hover:bg-[#1F1218] flex items-center justify-center gap-2.5 font-medium text-[14px] transition shadow-[0_8px_24px_rgba(46,26,34,0.18)]"
               >
-                <span className="text-lg"></span> Tiếp tục với Apple
-              </button>
+                <span className="text-[17px] -mt-0.5"></span> Tiếp tục với Apple
+              </motion.button>
 
-              <div className="relative py-2">
-                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-[#E8DDD3]" /></div>
-                <div className="relative flex justify-center"><span className="bg-[#FDF8F4] px-3 text-xs font-mono text-[#9A9A9A]">hoặc tạo tài khoản ngay</span></div>
+              <div className="relative py-3">
+                <div className="absolute inset-0 flex items-center"><div className="w-full h-px bg-gradient-to-r from-transparent via-[#F3DDE2] to-transparent" /></div>
+                <div className="relative flex justify-center"><span className="bg-[#FFF7F5] px-4 text-xs font-mono text-[#B08A95] rounded-full border border-[#FCE8EC] py-1">hoặc thử nhanh</span></div>
               </div>
 
-              <form onSubmit={demoLogin} className="flex gap-2">
+              <form onSubmit={demoLogin} className="flex gap-2 p-1.5 rounded-full glass-strong">
                 <input
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="demo@lumen.app"
                   type="email"
-                  className="flex-1 h-12 rounded-full border border-[#E8DDD3] bg-white px-5 text-sm outline-none focus:border-[#C96442] placeholder:text-[#9A9A9A]"
+                  className="flex-1 h-11 rounded-full bg-white/80 border border-[#FCE8EC] px-5 text-sm outline-none focus:border-[#FF8FA3] focus:bg-white placeholder:text-[#B08A95] transition"
                 />
-                <button disabled={loading} className="h-12 px-6 rounded-full bg-[#C96442] text-white font-medium text-sm hover:bg-[#A84E32] disabled:opacity-50">
-                  {loading ? "..." : "Vào"}
+                <button disabled={loading} className="h-11 px-7 rounded-full btn-primary font-semibold text-sm shrink-0 disabled:opacity-50">
+                  {loading ? "…" : "Vào →"}
                 </button>
               </form>
-              <p className="text-[11px] font-mono text-[#9A9A9A] text-center">Không cần mật khẩu</p>
+              <p className="text-[11px] font-mono text-[#B08A95] text-center tracking-wide">Không cần mật khẩu · Vào ngay để cảm nhận</p>
             </div>
 
-            <div className="grid grid-cols-3 gap-3 text-center">
+            <div className="grid grid-cols-3 gap-3">
               {[
-                ["01", "Mở thư", "Ảnh mờ, mở mới rõ"],
-                ["02", "Chọn một dòng", "Chạm prompt để trả lời"],
-                ["03", "Gửi bưu thiếp", "Kèm lời nhắn 6-140 ký tự"],
-              ].map(([n, t, d]) => (
-                <div key={n} className="rounded-2xl border border-[#E8DDD3] bg-[#FFFCF8] p-4">
-                  <div className="font-mono text-[10px] tracking-widest text-[#C96442]">{n}</div>
-                  <div className="text-xs font-medium mt-1">{t}</div>
-                  <div className="text-[11px] text-[#6B6B6B] leading-snug mt-1">{d}</div>
+                ["01", "Mở thư", "Ảnh mờ, chạm để hé lộ", "✉️"],
+                ["02", "Chọn một dòng", "Chạm prompt để trả lời", "💬"],
+                ["03", "Gửi bưu thiếp", "6–140 ký tự chân thành", "💌"],
+              ].map(([n, t, d, icon]) => (
+                <div key={n} className="rounded-[20px] glass p-4 text-center group hover:shadow-[0_8px_24px_rgba(46,26,34,0.06)] transition">
+                  <div className="w-8 h-8 rounded-full gradient-primary-soft border border-[#FCE8EC] grid place-items-center mx-auto text-[14px]">{icon}</div>
+                  <div className="font-mono text-[10px] tracking-[0.14em] text-[#FF8FA3] mt-2.5 font-semibold">{n}</div>
+                  <div className="text-[13px] font-semibold mt-1 text-[#2E1A22]">{t}</div>
+                  <div className="text-[11.5px] text-[#8E6B75] leading-snug mt-1">{d}</div>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="flex gap-4 text-xs font-mono text-[#9A9A9A] justify-center md:justify-start">
-            <Link href="/privacy" className="hover:underline">Privacy</Link>
-            <Link href="/terms" className="hover:underline">Terms</Link>
-            <Link href="/community-guidelines" className="hover:underline">Guidelines</Link>
+          <div className="flex gap-4 text-xs font-mono text-[#B08A95] justify-center lg:justify-start">
+            <Link href="/privacy" className="hover:text-[#2E1A22] transition">Privacy</Link>
+            <span className="opacity-30">·</span>
+            <Link href="/terms" className="hover:text-[#2E1A22] transition">Terms</Link>
+            <span className="opacity-30">·</span>
+            <Link href="/community-guidelines" className="hover:text-[#2E1A22] transition">Guidelines</Link>
           </div>
         </div>
 
-        <div className="hidden md:flex relative bg-[#F2EDE8] p-8 items-center justify-center overflow-hidden border-l border-[#E8DDD3]">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_60%_30%,rgba(201,100,66,0.12),transparent_50%)]" />
-          <div className="relative w-[380px] space-y-4 rotate-[-0.5deg]">
-            <div className="paper-card rounded-[20px] overflow-hidden">
-              <div className="px-5 pt-5 pb-3 flex items-center justify-between">
-                <span className="text-[10px] font-mono tracking-[0.14em] uppercase text-[#C96442]">Bưu thiếp #07 — Hôm nay</span>
-                <span className="text-[10px] font-mono text-[#9A9A9A]">20 · Q&A</span>
+        {/* RIGHT - preview */}
+        <div className="hidden lg:flex relative items-center justify-center p-8 xl:p-10 overflow-hidden">
+          <div className="absolute inset-0 -z-10">
+            <div className="absolute inset-0 bg-gradient-to-br from-[#FFF0F3] via-[#FFF7F5] to-[#F3EFFF]" />
+            <div className="aura aura-peach w-[420px] h-[420px] top-12 right-12" />
+            <div className="aura aura-lavender w-[520px] h-[520px] bottom-0 left-8" />
+            <div className="absolute inset-0 opacity-[0.015]" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")` }} />
+          </div>
+
+          <div className="relative w-[380px] xl:w-[400px] space-y-5">
+            {/* floating hearts */}
+            <div className="absolute -top-6 -right-2 text-[#FF8FA3] text-xl animate-float opacity-60">♥</div>
+            <div className="absolute top-32 -left-6 text-[#E8DEFF] text-2xl animate-float-2 opacity-50">✦</div>
+            <div className="absolute bottom-20 -right-4 text-[#FFB5A7] text-lg animate-float opacity-40">♥</div>
+
+            <motion.div
+              initial={{ y: 12, opacity: 0, rotate: -0.8 }}
+              animate={{ y: 0, opacity: 1, rotate: -0.6 }}
+              transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+              className="glass-strong rounded-[32px] overflow-hidden animate-float"
+            >
+              <div className="px-6 pt-6 pb-3 flex items-center justify-between">
+                <span className="text-[10px] font-mono tracking-[0.14em] uppercase text-[#FF4D6D] font-semibold flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#FF4D6D] animate-pulse-soft" /> Bưu thiếp #07 — Hôm nay
+                </span>
+                <span className="text-[11px] font-mono text-[#B08A95] bg-[#FFF0F3] border border-[#FCE8EC] px-2.5 py-1 rounded-full">20 · Q&A</span>
               </div>
-              <div className="h-[280px] bg-[#E8DDD3] relative mx-5 rounded-2xl overflow-hidden">
+              <div className="h-[300px] bg-[#FFE8EC] relative mx-6 rounded-[24px] overflow-hidden shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
                 <img src="https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=600&h=800&fit=crop" alt="" className="w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#1A1A1E]/60 to-transparent" />
-                <div className="absolute bottom-0 p-4 text-white">
-                  <div className="font-display text-lg leading-none">Maya, 26</div>
-                  <div className="text-xs font-mono opacity-80 mt-1">2 km · Thích cà phê & hiking</div>
+                <div className="absolute inset-0 bg-gradient-to-t from-[#2E1A22]/75 via-[#2E1A22]/10 to-transparent" />
+                <div className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-white/85 backdrop-blur text-[11px] font-medium text-[#2E1A22] flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> Online
+                </div>
+                <div className="absolute bottom-0 p-5 text-white w-full">
+                  <div className="font-display text-[20px] leading-none font-medium">Maya, 26</div>
+                  <div className="text-xs font-medium opacity-90 mt-1.5 flex items-center gap-2">
+                    <span>2 km · Thích cà phê & hiking</span>
+                    <span className="px-2 py-0.5 rounded-full bg-white/20 backdrop-blur border border-white/30 text-[10px]">INTJ · Yêu thư tay</span>
+                  </div>
                 </div>
               </div>
-              <div className="p-5 space-y-3">
-                <div className="rounded-2xl border border-[#E8DDD3] p-3 bg-[#FDF8F4]">
-                  <div className="text-[10px] font-mono tracking-widest uppercase text-[#C96442]">Điều khiến mình tò mò gần đây</div>
-                  <div className="font-display text-sm leading-snug mt-1">Cách người ta giữ thói quen viết tay mỗi sáng.</div>
+              <div className="p-6 space-y-3.5">
+                <div className="rounded-[20px] bg-gradient-to-br from-[#FFF0F3] to-[#FFF7F5] border border-[#FCE8EC] p-4 relative overflow-hidden">
+                  <div className="absolute -right-6 -top-6 w-20 h-20 rounded-full bg-[#FF8FA3]/10 blur-xl" />
+                  <div className="text-[10px] font-mono tracking-[0.14em] uppercase text-[#FF4D6D] font-semibold">Điều khiến mình tò mò gần đây</div>
+                  <div className="font-display text-[15px] leading-snug mt-1.5 text-[#2E1A22]">Cách người ta giữ thói quen viết tay mỗi sáng — mình muốn học điều đó.</div>
                 </div>
-                <div className="flex gap-1.5">
-                  <span className="px-2.5 py-1 rounded-full bg-[#F2EDE8] border border-[#E8DDD3] text-xs">Yoga</span>
-                  <span className="px-2.5 py-1 rounded-full bg-[#F2EDE8] border border-[#E8DDD3] text-xs">Photography</span>
-                  <span className="px-2.5 py-1 rounded-full bg-[#1A1A1E] text-white text-xs">Gửi lời nhắn →</span>
+                <div className="flex flex-wrap gap-1.5">
+                  <span className="px-3 py-1.5 rounded-full bg-[#FFF0F3] border border-[#FCE8EC] text-xs font-medium text-[#6E4A56]">🧘 Yoga</span>
+                  <span className="px-3 py-1.5 rounded-full bg-[#FFF0F3] border border-[#FCE8EC] text-xs font-medium text-[#6E4A56]">📸 Photography</span>
+                  <span className="px-3.5 py-1.5 rounded-full gradient-primary text-white text-xs font-semibold shadow-sm">Gửi lời nhắn →</span>
                 </div>
               </div>
-            </div>
-            <div className="paper-card rounded-2xl p-4 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-[#C96442] grid place-items-center text-white text-xs">✦</div>
-              <div className="text-sm">
-                <div className="font-medium">Đã kết nối — kèm lời nhắn</div>
-                <div className="text-xs text-[#6B6B6B]">“Mình cũng viết mỗi sáng, 7h ở Thảo Điền...”</div>
+            </motion.div>
+
+            <motion.div
+              initial={{ y: 12, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.3, duration: 0.6 }}
+              className="glass rounded-[24px] p-4 flex items-center gap-3.5 shadow-[0_8px_32px_rgba(46,26,34,0.08)]"
+            >
+              <div className="w-11 h-11 rounded-full gradient-primary grid place-items-center text-white text-sm shadow-[0_4px_12px_rgba(255,77,109,0.3)] shrink-0">♥</div>
+              <div className="text-sm flex-1 min-w-0">
+                <div className="font-semibold text-[#2E1A22]">Đã kết nối — kèm lời nhắn</div>
+                <div className="text-xs text-[#8E6B75] truncate">“Mình cũng viết mỗi sáng, 7h ở Thảo Điền... ☕️”</div>
               </div>
+              <div className="w-8 h-8 rounded-full bg-emerald-500 text-white grid place-items-center text-xs shrink-0">✓</div>
+            </motion.div>
+
+            <div className="flex justify-center gap-1.5 pt-2">
+              <span className="w-6 h-1.5 rounded-full bg-[#FF4D6D]" />
+              <span className="w-1.5 h-1.5 rounded-full bg-[#F3DDE2]" />
+              <span className="w-1.5 h-1.5 rounded-full bg-[#F3DDE2]" />
             </div>
           </div>
         </div>
       </div>
+
+      {/* footer aura bottom */}
+      <div className="h-px w-full bg-gradient-to-r from-transparent via-[#F3DDE2] to-transparent" />
     </div>
   );
 }

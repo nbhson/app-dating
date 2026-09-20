@@ -120,17 +120,17 @@ export default function OnboardingClient({ initial }: Props) {
   }
 
   return (
-    <div className="min-h-screen bg-[#FDF8F4] flex flex-col">
-      <div className="max-w-2xl w-full mx-auto p-6 md:p-10 flex-1 flex flex-col">
+    <div className="min-h-screen flex flex-col relative">
+      <div className="max-w-2xl w-full mx-auto p-6 md:p-10 flex-1 flex flex-col relative">
         <div className="flex items-center gap-3 mb-8">
-          <div className="w-8 h-8 rounded-full bg-[#1A1A1E] grid place-items-center text-white font-mono text-[11px]">Lm</div>
-          <span className="font-display text-lg">Lumen</span>
-          <span className="ml-auto text-xs font-mono text-[#6B6B6B]">Bước {step} / 5</span>
+          <div className="w-9 h-9 rounded-2xl gradient-primary grid place-items-center text-white shadow-[0_6px_16px_rgba(255,77,109,0.3)]">♥</div>
+          <span className="font-display text-lg font-semibold">Lumen</span>
+          <span className="ml-auto text-xs font-mono bg-white border border-[#FCE8EC] px-3 py-1.5 rounded-full text-[#8E6B75]">Bước {step} / 5</span>
         </div>
 
         <div className="flex gap-2 mb-8">
           {[1, 2, 3, 4, 5].map((s) => (
-            <div key={s} className={`h-1.5 flex-1 rounded-full ${s <= step ? "bg-[#C96442]" : "bg-[#E8DDD3]"}`} />
+            <div key={s} className={`h-2 flex-1 rounded-full transition-all ${s <= step ? "gradient-primary shadow-sm" : "bg-[#FFE8EC] border border-[#FCE8EC]"}`} />
           ))}
         </div>
 
