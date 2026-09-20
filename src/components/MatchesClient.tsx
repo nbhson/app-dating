@@ -2,7 +2,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n/context";
-import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 export default function MatchesClient() {
   const { t, trans, locale } = useI18n();
@@ -31,7 +30,6 @@ export default function MatchesClient() {
       <div className="shrink-0 bg-white/80 backdrop-blur-xl border-b border-[#FCE8EC] px-5 py-4 flex items-center justify-between">
         <h1 className="font-display text-[22px] font-medium flex items-center gap-2">{t.matches.title} <span className="text-[#FF8FA3] text-sm">✉</span> <span className="ml-1 text-xs font-mono font-medium bg-[#FFF0F3] border border-[#FCE8EC] px-2.5 py-1 rounded-full text-[#8E6B75]">{trans("matches.letters", { count: matches.length })}</span></h1>
         <div className="flex items-center gap-2">
-          <LanguageSwitcher variant="compact" className="hidden sm:inline-flex" />
           <Link href="/discover" className="text-xs font-semibold tracking-wide text-white btn-primary rounded-full px-4 py-2 shadow-sm">
             {t.matches.cards}
           </Link>

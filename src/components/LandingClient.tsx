@@ -4,7 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { useI18n } from "@/lib/i18n/context";
-import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 export default function LandingClient() {
   const { t, trans } = useI18n();
@@ -55,7 +54,6 @@ export default function LandingClient() {
             <span className="ml-auto hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full glass text-[11px] font-medium text-[#8E6B75]">
               <span className="w-1.5 h-1.5 rounded-full bg-[#FF4D6D] animate-pulse-soft" /> {t.landing.onlineNow}
             </span>
-            <LanguageSwitcher variant="compact" className="ml-1 hidden sm:inline-flex" />
           </div>
 
           <div className="max-w-[560px] mx-auto w-full flex flex-col gap-5 lg:gap-6 py-2 lg:py-4">

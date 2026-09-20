@@ -48,9 +48,38 @@ const promptAs = [
 function random<T>(arr: T[]) { return arr[Math.floor(Math.random()*arr.length)]; }
 function randomAge() { return 22 + Math.floor(Math.random()*12); }
 
+const ADMIN_EMAIL = "nbhson43@gmail.com";
+
 async function main() {
   console.log("Seeding...");
   const demoPasswordHash = await bcrypt.hash("Lumen123!", 10);
+  // Ensure primary admin exists
+  {
+    let admin = await prisma.user.findUnique({ where: { email: ADMIN_EMAIL } });
+    if (!admin) {
+      admin = await prisma.user.create({
+        data: { email: ADMIN_EMAIL, name: "Admin Son", passwordHash: demoPasswordHash, status: "ACTIVE", isAdmin: true, lastActiveAt: new Date() },
+      });
+      console.log(`Created admin ${ADMIN_EMAIL}`);
+    } else if (!admin.isAdmin || !admin.passwordHash) {
+      admin = await prisma.user.update({ where: { id: admin.id }, data: { isAdmin: true, passwordHash: admin.passwordHash ?? demoPasswordHash, status: "ACTIVE" } });
+      console.log(`Promoted ${ADMIN_EMAIL} to admin`);
+    }
+    // ensure profile exists for admin so discover doesn't break
+    const existingProfile = await prisma.profile.findUnique({ where: { userId: admin.id } });
+    if (!existingProfile) {
+      const dob = new Date(); dob.setFullYear(dob.getFullYear() - 28);
+      await prisma.profile.create({
+        data: { userId: admin.id, firstName: "Son", dob, gender: "MAN", location: "Thảo Điền, Q2", bio: "Admin Lumen — Letters, not swipes. Liên hệ nbhson43@gmail.com", interests: JSON.stringify(["Coffee","Music","Books"]) },
+      });
+    }
+    // cleanup legacy admin email no longer used
+    const legacy = await prisma.user.findUnique({ where: { email: "admin@admin.admin" } });
+    if (legacy) {
+      await prisma.user.update({ where: { id: legacy.id }, data: { isAdmin: false } });
+      console.log("Demoted legacy admin@admin.admin");
+    }
+  }
   // Demo users chỉ tạo khi SEED_DEMO=1 — mặc định giữ DB sạch, chỉ user đăng ký thật mới hiện ở Bưu thiếp
   if (process.env.SEED_DEMO === "1") {
   for (let i=0; i<35; i++) {
@@ -157,7 +186,7 @@ async function main() {
     }
   }
 
-  console.log("Seed done. " + (process.env.SEED_DEMO === "1" ? "Admin: demo1@lumen.app / Lumen123!" : "SEED_DEMO!=1 nên không tạo demo users — chỉ giữ user đăng ký thật"));
+  console.log("Seed done. Admin: " + ADMIN_EMAIL + " / Lumen123! " + (process.env.SEED_DEMO === "1" ? "+ demo1@lumen.app" : "SEED_DEMO!=1 nên không tạo demo users — chỉ giữ user đăng ký thật"));
 }
 
 main().then(()=>process.exit(0)).catch(e=>{console.error(e); process.exit(1)});

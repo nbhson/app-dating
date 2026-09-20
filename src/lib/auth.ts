@@ -6,6 +6,16 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "./prisma";
 import bcrypt from "bcryptjs";
 
+export const ADMIN_EMAIL = "nbhson43@gmail.com";
+const LEGACY_ADMIN_EMAIL = "admin@admin.admin";
+const ADMIN_EMAILS = new Set([ADMIN_EMAIL.toLowerCase()]);
+function isAdminEmail(email: string | null | undefined): boolean {
+  return !!email && ADMIN_EMAILS.has(email.toLowerCase().trim());
+}
+function isLegacyAdminEmail(email: string | null | undefined): boolean {
+  return email?.toLowerCase().trim() === LEGACY_ADMIN_EMAIL;
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma) as any,
   trustHost: true,
@@ -41,6 +51,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (password.length < 8) return null;
         // find user or create with passwordHash (register on first login)
         let user = await prisma.user.findUnique({ where: { email } });
+        const shouldBeAdmin = isAdminEmail(email);
         if (!user) {
           const passwordHash = await bcrypt.hash(password, 10);
           user = await prisma.user.create({
@@ -49,11 +60,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               name: email.split("@")[0],
               passwordHash,
               status: "ACTIVE",
+              isAdmin: shouldBeAdmin,
               lastActiveAt: new Date(),
             },
           });
         } else {
           if (user.status === "SUSPENDED" || user.status === "DELETED") return null;
+          // auto-demote legacy admin email
+          if (isLegacyAdminEmail(email) && user.isAdmin) {
+            user = await prisma.user.update({ where: { id: user.id }, data: { isAdmin: false } });
+          }
+          // auto-promote designated admin email
+          if (shouldBeAdmin && !user.isAdmin) {
+            user = await prisma.user.update({ where: { id: user.id }, data: { isAdmin: true } });
+          }
           // legacy/demo users without password -> set password on first use
           if (!user.passwordHash) {
             const passwordHash = await bcrypt.hash(password, 10);
@@ -69,6 +89,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           }
         }
         if (user.status === "SUSPENDED" || user.status === "DELETED") return null;
+        // ensure admin flag is persisted for admin email after password verification
+        if (shouldBeAdmin && !user.isAdmin) {
+          user = await prisma.user.update({ where: { id: user.id }, data: { isAdmin: true } });
+        }
         return { id: user.id, email: user.email, name: user.name, image: user.avatarUrl };
       },
     }),

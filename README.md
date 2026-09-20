@@ -206,9 +206,9 @@ npx tsx prisma/seed.ts
 npm run dev  # http://localhost:3000
 ```
 
-**Demo không OAuth:** Nhập bất kỳ email ở landing (vd `demo1@lumen.app` là admin seed).
+**Demo không OAuth:** Nhập bất kỳ email ở landing (vd `demo1@lumen.app` khi SEED_DEMO=1).
 
-**Tạo admin:** `npx prisma studio` hoặc `UPDATE User SET isAdmin=1 WHERE email='you@...';`
+**Admin đêm:** `nbhson43@gmail.com` / `Lumen123!`. Seed tự tạo/nâng quyền `nbhson43@gmail.com` làm admin và hạ quyền email cũ `admin@admin.admin`. Muốn đặt admin khác: `npx prisma studio` hoặc `UPDATE User SET isAdmin=1 WHERE email='you@...';`
 
 ### Env
 

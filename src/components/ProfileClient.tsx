@@ -2,7 +2,6 @@
 import { useState } from "react";
 import { signOut } from "next-auth/react";
 import { useI18n } from "@/lib/i18n/context";
-import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 export default function ProfileClient({ user }: { user: any }) {
   const { t, trans, locale } = useI18n();
@@ -86,12 +85,8 @@ export default function ProfileClient({ user }: { user: any }) {
 
   return (
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-      <div className="shrink-0 flex items-center justify-between px-4 md:px-6 pt-4 md:pt-5 pb-3 bg-transparent">
+      <div className="shrink-0 flex items-center px-4 md:px-6 pt-4 md:pt-5 pb-3 bg-transparent">
         <h1 className="font-display text-[22px] md:text-[26px] font-medium flex items-center gap-2">{t.profile.title} <span className="text-[#FF8FA3]">♥</span></h1>
-        <div className="flex items-center gap-2">
-          <LanguageSwitcher variant="compact" />
-          <button onClick={() => signOut({ callbackUrl: "/" })} className="text-sm font-medium border border-[#FCE8EC] rounded-full px-4 py-2 bg-white hover:bg-[#FFF0F3] transition">{t.profile.logout}</button>
-        </div>
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar overscroll-contain">
         <div className="max-w-2xl mx-auto w-full px-4 md:px-6 pb-[88px] md:pb-4 space-y-4 md:space-y-5">

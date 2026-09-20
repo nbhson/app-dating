@@ -22,7 +22,7 @@ export async function GET() {
   const discoveryToday = await prisma.dailyUsage.aggregate({ _sum: { profilesViewed: true }, where: { date } });
 
   const reports = await prisma.report.findMany({ take: 20, orderBy: { createdAt: "desc" }, include: { reporter: true, reported: true } });
-  const users = await prisma.user.findMany({ take: 20, orderBy: { createdAt: "desc" }, include: { profile: true } });
+  const users = await prisma.user.findMany({ take: 20, orderBy: { createdAt: "desc" }, include: { profile: true, photos: { orderBy: { position: "asc" } } } });
 
   return NextResponse.json({
     totalUsers,

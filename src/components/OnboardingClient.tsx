@@ -2,7 +2,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n/context";
-import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 type Props = {
   initial: { profile: any; photos: any[]; preferences: any; promptAnswers?: any[] };
@@ -128,8 +127,7 @@ export default function OnboardingClient({ initial }: Props) {
         <div className="flex items-center gap-3 mb-8">
           <div className="w-9 h-9 rounded-2xl gradient-primary grid place-items-center text-white shadow-[0_6px_16px_rgba(255,77,109,0.3)]">♥</div>
           <span className="font-display text-lg font-semibold">Lumen</span>
-          <LanguageSwitcher variant="compact" className="ml-auto" />
-          <span className="text-xs font-mono bg-white border border-[#FCE8EC] px-3 py-1.5 rounded-full text-[#8E6B75]">{trans("onboarding.stepOf", { current: step, total: 5 })}</span>
+          <span className="ml-auto text-xs font-mono bg-white border border-[#FCE8EC] px-3 py-1.5 rounded-full text-[#8E6B75]">{trans("onboarding.stepOf", { current: step, total: 5 })}</span>
         </div>
 
         <div className="flex gap-2 mb-8">

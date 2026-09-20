@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { useI18n } from "@/lib/i18n/context";
-import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 type Prompt = { id: string; question: string; answer: string };
 type Profile = {
@@ -181,7 +180,6 @@ export default function DiscoverClient() {
                 <span className="hidden lg:inline text-[10px] font-mono text-[#B08A95]">{trans("discover.remaining", { count: usage.remaining })}</span>
               </div>
             )}
-            <LanguageSwitcher variant="compact" className="hidden sm:inline-flex" />
             <Link href="/matches" className="relative w-10 h-10 rounded-full bg-white border border-[#FCE8EC] grid place-items-center hover:bg-[#FFF0F3] hover:border-[#FFD6DE] transition shadow-sm group">
               <span className="text-[15px] group-hover:scale-110 transition">✉</span>
               {unreadTotal > 0 && (

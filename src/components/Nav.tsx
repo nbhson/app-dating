@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, useMemo } from "react";
+import { signOut } from "next-auth/react";
 import { useI18n } from "@/lib/i18n/context";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 
@@ -118,6 +119,9 @@ export default function Nav() {
             </div>
             <div className="flex flex-col items-center gap-2">
               <LanguageSwitcher variant="pill" />
+              <button onClick={() => signOut({ callbackUrl: "/" })} className="w-full h-10 rounded-full bg-white border border-[#FCE8EC] text-sm font-semibold text-[#2E1A22] hover:bg-[#FFF0F3] hover:border-[#FFD6DE] transition flex items-center justify-center gap-2 shadow-sm">
+                <span className="text-[13px]">↪</span> {(t.profile as any).logout ?? "Đăng xuất"}
+              </button>
               <div className="flex items-center justify-center gap-2 text-[11px] font-mono text-[#B08A95]">
                 <Link href="/privacy" className="hover:text-[#2E1A22] transition px-2 py-1 rounded-full hover:bg-white">{t.common.privacy}</Link>
                 <span className="opacity-30">·</span>
@@ -129,7 +133,13 @@ export default function Nav() {
       </aside>
 
       {/* Mobile bottom - floating pill glass */}
-      <nav className="md:hidden fixed bottom-4 inset-x-4 z-50 flex justify-center pointer-events-none">
+      <nav className="md:hidden fixed bottom-4 inset-x-4 z-50 flex flex-col items-center gap-2 pointer-events-none">
+        <div className="pointer-events-auto flex items-center gap-1.5 p-1 rounded-full glass-strong shadow-[0_8px_20px_rgba(46,26,34,0.12)] border border-white/70">
+          <LanguageSwitcher variant="compact" />
+          <button onClick={() => signOut({ callbackUrl: "/" })} className="h-8 px-3.5 rounded-full bg-white border border-[#FCE8EC] text-xs font-semibold text-[#2E1A22] hover:bg-[#FFF0F3] flex items-center gap-1">
+            ↪ {(t.profile as any).logout ?? "Đăng xuất"}
+          </button>
+        </div>
         <div className="pointer-events-auto flex items-center gap-1.5 p-1.5 rounded-full glass-strong shadow-[0_12px_32px_rgba(46,26,34,0.18),0_4px_12px_rgba(255,77,109,0.12)] border border-white/70">
           {items.map((i) => {
             const active = pathname.startsWith(i.href);
@@ -139,7 +149,7 @@ export default function Nav() {
               <Link
                 key={i.href}
                 href={i.href}
-                className={`relative flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-semibold transition-all ${active ? "bg-[#2E1A22] text-white shadow-[0_4px_12px_rgba(46,26,34,0.2)]" : "text-[#8E6B75] hover:bg-white hover:text-[#2E1A22]"}`}
+                className={`relative flex items-center gap-2 px-4 py-2.5 rounded-full text-xs font-semibold transition-all ${active ? "bg-[#2E1A22] text-white shadow-[0_4px_12px_rgba(46,26,34,0.2)]" : "text-[#8E6B75] hover:bg-white hover:text-[#2E1A22]"}`}
               >
                 <span className="text-[13px] leading-none relative">
                   {i.icon}
