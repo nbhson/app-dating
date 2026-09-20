@@ -49,9 +49,9 @@ export async function POST(req: Request) {
   if (isPriority) {
     await prisma.user.update({ where: { id: userId }, data: { stamps: { decrement: 1 } } });
   }
-  // notify recipient
+  // notify recipient — link thẳng vào tab "Ai thích mình" để không bị lạc (bug fix)
   try {
-    await prisma.notification.create({ data: { userId: toUserId, type: "LIKE", title: isPriority ? "Bưu thiếp ưu tiên! ✦" : "Bạn có bưu thiếp mới", body: comment.trim().slice(0, 80), link: "/matches" } });
+    await prisma.notification.create({ data: { userId: toUserId, type: "LIKE", title: isPriority ? "Bưu thiếp ưu tiên! ✦" : "Bạn có bưu thiếp mới", body: comment.trim().slice(0, 80), link: "/matches?tab=liked" } });
   } catch {}
 
   if (reciprocal) {

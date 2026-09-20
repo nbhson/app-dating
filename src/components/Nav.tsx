@@ -36,10 +36,12 @@ export default function Nav() {
         if (!r.ok) return;
         const d = await r.json();
         const total = (d.matches ?? []).reduce((s: number, m: any) => s + (m.unread || 0), 0);
+        const pending = d.pendingLikesCount ?? d.pendingLikes?.length ?? 0;
+        const combinedTotal = total + pending;
         const countMatchesWithUnread = (d.matches ?? []).filter((m: any) => m.unread > 0).length;
         if (!cancelled) {
-          setUnreadTotal(total);
-          setUnreadByMatch(countMatchesWithUnread);
+          setUnreadTotal(combinedTotal);
+          setUnreadByMatch(countMatchesWithUnread + (pending > 0 ? 1 : 0));
         }
         const rn = await fetch("/api/notifications?unread=true").then(x=>x.json()).catch(()=>null);
         if (rn && !cancelled) setNotifUnread(rn.unreadCount ?? 0);

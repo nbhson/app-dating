@@ -35,11 +35,41 @@ export async function GET() {
         lastMessage: m.messages[0]?.content ?? null,
         lastMessageAt: m.messages[0]?.createdAt ?? m.createdAt,
         unread,
+        type: "match" as const,
       };
     })
   );
 
   data.sort((a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime());
 
-  return NextResponse.json({ matches: data });
+  // pending likes (bưu thiếp chưa đáp lại) — đây là bug gốc: chỉ báo notification mà không vào hòm thư
+  const mySentLikes = await prisma.like.findMany({ where: { fromUserId: userId }, select: { toUserId: true } });
+  const sentSet = new Set(mySentLikes.map((x) => x.toUserId));
+  const pendingLikesRaw = await prisma.like.findMany({
+    where: { toUserId: userId, fromUserId: { notIn: Array.from(sentSet) } },
+    orderBy: { createdAt: "desc" },
+    include: { fromUser: { include: { profile: true, photos: { take: 1, orderBy: { position: "asc" } } } } },
+    take: 20,
+  });
+  const pendingLikes = pendingLikesRaw.map((l) => ({
+    id: `like_${l.id}`,
+    likeId: l.id,
+    createdAt: l.createdAt,
+    type: "like" as const,
+    other: {
+      id: l.fromUser.id,
+      name: l.fromUser.profile?.firstName ?? l.fromUser.name ?? "User",
+      age: l.fromUser.profile ? getAge(l.fromUser.profile.dob) : undefined,
+      photo: l.fromUser.photos[0]?.url ?? null,
+      intent: null,
+    },
+    comment: l.comment,
+    anchor: (l as any).promptId,
+    isPriority: (l as any).isPriority,
+    lastMessage: `“${l.comment?.slice(0, 60) ?? ""}” — bưu thiếp mới`,
+    lastMessageAt: l.createdAt,
+    unread: 1,
+  }));
+
+  return NextResponse.json({ matches: data, pendingLikes, pendingLikesCount: pendingLikes.length });
 }

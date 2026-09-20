@@ -1,36 +1,64 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n/context";
 import { usePopup } from "@/components/ui/PopupProvider";
 
 export default function MatchesClient() {
   const { t, trans, locale } = useI18n();
   const { toast } = usePopup();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const initialTab = (searchParams.get("tab") as any) ?? "all";
   const [matches, setMatches] = useState<any[]>([]);
+  const [pendingLikes, setPendingLikes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"all" | "new" | "chatting" | "liked" | "favorites">("all");
+  const [tab, setTab] = useState<"all" | "new" | "chatting" | "liked" | "favorites">(initialTab === "liked" ? "liked" : "all");
   const [liked, setLiked] = useState<any[]>([]);
   const [favorites, setFavorites] = useState<any[]>([]);
   const [likesLoading, setLikesLoading] = useState(false);
+
+  // sync tab to URL
   useEffect(() => {
-    fetch("/api/matches")
-      .then((r) => r.json())
-      .then((d) => {
-        setMatches(d.matches ?? []);
-        setLoading(false);
-      });
+    const urlTab = searchParams.get("tab");
+    if (urlTab === "liked" && tab !== "liked") setTab("liked");
+  }, [searchParams]);
+
+  const switchTab = (v: string) => {
+    setTab(v as any);
+    const params = new URLSearchParams(searchParams.toString());
+    if (v === "liked") params.set("tab", "liked");
+    else params.delete("tab");
+    router.replace(`/matches${params.toString() ? `?${params.toString()}` : ""}`, { scroll: false });
+  };
+
+  const reloadMatches = async () => {
+    const d = await fetch("/api/matches").then((r) => r.json());
+    setMatches(d.matches ?? []);
+    setPendingLikes(d.pendingLikes ?? []);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    reloadMatches();
   }, []);
+
   useEffect(()=>{
     if(tab==="liked"){
-      setLikesLoading(true);
-      fetch("/api/likes?type=received").then(r=>r.json()).then(d=>{ setLiked(d.likes ?? []); setLikesLoading(false);});
+      // use pendingLikes from matches if available, else fetch
+      if (pendingLikes.length > 0 && liked.length === 0) {
+        setLiked(pendingLikes.map((p: any) => ({ id: p.likeId, comment: p.comment, anchor: p.anchor, isPriority: p.isPriority, user: p.other, createdAt: p.createdAt })));
+      } else {
+        setLikesLoading(true);
+        fetch("/api/likes?type=received").then(r=>r.json()).then(d=>{ setLiked(d.likes ?? []); setLikesLoading(false);});
+      }
     }
     if(tab==="favorites"){
       setLikesLoading(true);
       fetch("/api/favorites").then(r=>r.json()).then(d=>{ setFavorites(d.favorites ?? []); setLikesLoading(false);});
     }
-  },[tab]);
+  },[tab, pendingLikes]);
 
   if (loading) return <div className="p-8 text-sm font-mono text-[#8E6B75] animate-pulse">{t.matches.loading}</div>;
 
@@ -43,7 +71,7 @@ export default function MatchesClient() {
   return (
     <div className="max-w-2xl mx-auto w-full h-full max-h-[calc(100dvh-88px)] md:max-h-[calc(100dvh-1rem)] glass-strong md:rounded-[28px] overflow-hidden md:my-2 border border-white/60 shadow-[0_12px_40px_rgba(46,26,34,0.08)] flex flex-col">
       <div className="shrink-0 bg-white/80 backdrop-blur-xl border-b border-[#FCE8EC] px-5 py-4 flex items-center justify-between">
-        <h1 className="font-display text-[22px] font-medium flex items-center gap-2">{t.matches.title} <span className="text-[#FF8FA3] text-sm">✉</span> <span className="ml-1 text-xs font-mono font-medium bg-[#FFF0F3] border border-[#FCE8EC] px-2.5 py-1 rounded-full text-[#8E6B75]">{trans("matches.letters", { count: matches.length })}</span></h1>
+        <h1 className="font-display text-[22px] font-medium flex items-center gap-2">{t.matches.title} <span className="text-[#FF8FA3] text-sm">✉</span> <span className="ml-1 text-xs font-mono font-medium bg-[#FFF0F3] border border-[#FCE8EC] px-2.5 py-1 rounded-full text-[#8E6B75]">{trans("matches.letters", { count: matches.length + pendingLikes.length })}</span></h1>
         <div className="flex items-center gap-2">
           <Link href="/discover" className="text-xs font-semibold tracking-wide text-white btn-primary rounded-full px-4 py-2 shadow-sm">
             {t.matches.cards}
@@ -58,12 +86,28 @@ export default function MatchesClient() {
           ["chatting", t.matches.tabsChatting],
           ["liked", (t.matches as any).tabsLiked ?? "Ai thích mình"],
           ["favorites", (t.matches as any).tabsFavorites ?? "Đã lưu ♥"],
-        ].map(([v, l]) => (
-          <button key={v} onClick={() => setTab(v as any)} className={`px-4 py-2 rounded-full text-xs font-semibold border transition-all whitespace-nowrap ${tab === v ? "bg-[#2E1A22] text-white border-[#2E1A22] shadow-[0_4px_12px_rgba(46,26,34,0.18)]" : "bg-white border-[#FCE8EC] text-[#8E6B75] hover:border-[#FFD6DE] hover:text-[#2E1A22]"}`}>
-            {l}
-          </button>
-        ))}
+        ].map(([v, l]) => {
+          const isLikedTab = v === "liked";
+          const badge = isLikedTab && pendingLikes.length > 0 ? pendingLikes.length : undefined;
+          return (
+            <button key={v} onClick={() => switchTab(v)} className={`px-4 py-2 rounded-full text-xs font-semibold border transition-all whitespace-nowrap flex items-center gap-1.5 ${tab === v ? "bg-[#2E1A22] text-white border-[#2E1A22] shadow-[0_4px_12px_rgba(46,26,34,0.18)]" : "bg-white border-[#FCE8EC] text-[#8E6B75] hover:border-[#FFD6DE] hover:text-[#2E1A22]"}`}>
+              {l} {badge ? <span className={`min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold grid place-items-center ${tab===v ? "bg-[#FF4D6D] text-white" : "bg-[#FF4D6D] text-white"}`}>{badge}</span> : null}
+            </button>
+          );
+        })}
       </div>
+
+      {/* Banner pending likes khi ở tab all và có pending */}
+      {tab === "all" && pendingLikes.length > 0 && (
+        <div className="shrink-0 mx-4 mt-3 rounded-[16px] bg-amber-50 border border-amber-200 p-3 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-full bg-amber-400 text-white grid place-items-center text-sm">✉</div>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-semibold text-[#7A5A2E]">Bạn có {pendingLikes.length} bưu thiếp mới chưa xem</div>
+            <div className="text-xs text-[#8E6B75] truncate">Họ đã gửi kèm lời nhắn — đáp lại để tạo kết nối ♥</div>
+          </div>
+          <button onClick={() => switchTab("liked")} className="px-4 py-2 rounded-full bg-[#1A1A1E] text-white text-xs font-semibold shrink-0">Xem ngay →</button>
+        </div>
+      )}
 
       {tab==="liked" ? (
         likesLoading ? <div className="p-8 text-sm animate-pulse">Đang tải...</div> :
@@ -78,8 +122,11 @@ export default function MatchesClient() {
               </div>
               <button onClick={async()=>{
                 const r=await fetch("/api/discover/like",{method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({toUserId:l.user.id, comment: `Cảm ơn vì “${l.comment.slice(0,30)}” — mình cũng thích bạn`, anchor:l.anchor})});
-                const d=await r.json(); if(d.status?.includes("MATCH")) toast("Đã ghép đôi ♥", "success"); else if(r.ok) toast("Đã gửi bưu thiếp", "success"); else toast(d.error, "error");
-                setTab("all");
+                const d=await r.json(); if(d.status?.includes("MATCH")) { toast("Đã ghép đôi ♥ — đã vào hòm thư", "success"); } else if(r.ok) toast("Đã gửi bưu thiếp", "success"); else toast(d.error, "error");
+                await reloadMatches();
+                setLiked(prev=>prev.filter(x=>x.id!==l.id));
+                setPendingLikes(prev=>prev.filter((x:any)=>x.likeId!==l.id && x.id!==`like_${l.id}`));
+                if (d.status?.includes("MATCH")) switchTab("all");
               }} className="px-3 py-1.5 rounded-full bg-[#2E1A22] text-white text-xs font-semibold">{(t.matches as any).reply ?? "Đáp lại"}</button>
             </div>
           ))}
@@ -96,7 +143,7 @@ export default function MatchesClient() {
             </div>
           ))}
         </div>
-      ) : filtered.length === 0 ? (
+      ) : filtered.length === 0 && pendingLikes.length===0 ? (
         <div className="p-10 text-center space-y-4 flex-1 grid place-items-center">
           <div>
             <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#FFF0F3] to-[#FFE8EC] border border-[#FCE8EC] grid place-items-center mx-auto text-2xl shadow-sm">💌</div>
@@ -106,6 +153,19 @@ export default function MatchesClient() {
               {t.matches.openCard}
             </Link>
           </div>
+        </div>
+      ) : filtered.length === 0 && pendingLikes.length>0 && tab==="all" ? (
+        <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-[#FCE8EC]/60">
+          {pendingLikes.map((p:any)=>(
+            <div key={p.id} className="flex items-center gap-3.5 p-4 hover:bg-amber-50/50 bg-amber-50/30">
+              <div className="w-12 h-12 rounded-full overflow-hidden bg-[#FFE8EC] border-2 border-amber-200 shadow-sm">{p.other.photo ? <img src={p.other.photo} alt="" className="w-full h-full object-cover"/> : <div className="w-full h-full grid place-items-center text-[#FF8FA3]">♥</div>}</div>
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold text-sm flex items-center gap-2">{p.other.name} <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-400 text-white">Bưu thiếp mới</span></div>
+                <div className="text-xs italic text-[#8E6B75] truncate">{p.lastMessage}</div>
+              </div>
+              <button onClick={() => switchTab("liked")} className="px-3 py-1.5 rounded-full bg-amber-500 text-white text-xs font-semibold">Xem</button>
+            </div>
+          ))}
         </div>
       ) : (
         <div className="divide-y divide-[#FCE8EC]/60 flex-1 min-h-0 overflow-y-auto no-scrollbar overscroll-contain">
