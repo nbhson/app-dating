@@ -1,14 +1,17 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useI18n } from "@/lib/i18n/context";
 
 export default function ChatClient({ matchId }: { matchId: string }) {
+  const { t, trans } = useI18n();
   const [messages, setMessages] = useState<any[]>([]);
   const [other, setOther] = useState<any>(null);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(true);
   const [slowInfo, setSlowInfo] = useState<{ remaining: number; resetAt?: string } | null>(null);
   const [starter, setStarter] = useState<string | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   async function load() {
@@ -37,7 +40,7 @@ export default function ChatClient({ matchId }: { matchId: string }) {
     e.preventDefault();
     if (!input.trim()) return;
     if (slowInfo && slowInfo.remaining <= 0) {
-      alert("Bạn đã dùng hết 5 tin nhắn cho hôm nay với kết nối mới. Quay lại ngày mai để trò chuyện chậm hơn.");
+      alert(t.chat.slowLimit);
       return;
     }
     const content = input;
@@ -50,63 +53,90 @@ export default function ChatClient({ matchId }: { matchId: string }) {
     });
     if (!res.ok) {
       const d = await res.json();
-      if (d.error === "SLOW_LIMIT") alert("Đã hết lượt nhắn hôm nay (5/ngày cho 48h đầu). Hãy để câu chuyện ngấm.");
+      if (d.error === "SLOW_LIMIT") alert(t.chat.slowLimitShort);
       load();
     } else load();
   }
 
-  if (loading) return <div className="p-8 text-sm font-mono text-[#8E6B75] animate-pulse">Đang mở thư… ✨</div>;
+  if (loading) return <div className="p-8 text-sm font-mono text-[#8E6B75] animate-pulse">{t.chat.loading}</div>;
 
   return (
-    <div className="flex-1 flex flex-col max-w-2xl w-full mx-auto glass-strong md:rounded-[28px] overflow-hidden md:my-4 md:border border-white/60 shadow-[0_12px_40px_rgba(46,26,34,0.08)] min-h-screen md:min-h-[700px]">
-      <div className="sticky top-0 bg-white/80 backdrop-blur-xl border-b border-[#FCE8EC] px-4 py-3.5 flex items-center gap-3">
+    <div className="flex-1 min-h-0 flex flex-col max-w-2xl w-full mx-auto glass-strong md:rounded-[28px] overflow-hidden md:my-2 md:border border-white/60 shadow-[0_12px_40px_rgba(46,26,34,0.08)] h-full max-h-[calc(100dvh-88px)] md:max-h-[100dvh]">
+      <div className="shrink-0 bg-white/80 backdrop-blur-xl border-b border-[#FCE8EC] px-4 py-3.5 flex items-center gap-3">
         <Link href="/matches" className="w-9 h-9 rounded-full bg-white border border-[#FCE8EC] grid place-items-center hover:bg-[#FFF0F3] transition shadow-sm">
-          ‹
+          {t.chat.back}
         </Link>
         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FFE8EC] to-[#F3EFFF] border border-white overflow-hidden shadow-sm">
           {other?.photo ? <img src={other.photo} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full grid place-items-center text-[#FF8FA3]">♥</div>}
         </div>
         <div>
-          <div className="font-semibold text-sm leading-none flex items-center gap-1.5">{other?.name ?? "Thư"} <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /></div>
+          <div className="font-semibold text-sm leading-none flex items-center gap-1.5">{other?.name ?? t.matches.title} <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /></div>
           <div className="text-[11px] font-medium text-[#8E6B75] flex items-center gap-1.5">
             {slowInfo ? (
               <>
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold border ${slowInfo.remaining <= 1 ? "bg-amber-50 border-amber-200 text-amber-700" : "bg-[#FFF0F3] border-[#FCE8EC] text-[#FF4D6D]"}`}>
-                  {slowInfo.remaining} tin nhắn còn lại hôm nay
+                  {trans("chat.remaining", { count: slowInfo.remaining })}
                 </span>
-                <span className="hidden sm:inline text-[#B08A95]">· chậm mà sâu</span>
+                <span className="hidden sm:inline text-[#B08A95]">· {t.chat.slowHint}</span>
               </>
-            ) : "Kết nối bưu thiếp 💌"}
+            ) : t.chat.connected}
           </div>
         </div>
         <div className="ml-auto flex gap-2">
           <button
+            onClick={() => setReportOpen(true)}
+            className="text-xs font-medium border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-full px-3.5 py-1.5 transition"
+          >
+            {(t.chat as any).report ?? (t.discover as any).report ?? "Báo cáo"}
+          </button>
+          <button
             onClick={async () => {
               if (!other) return;
-              if (!confirm(`Chặn ${other.name}?`)) return;
+              if (!confirm(trans("chat.blockConfirm", { name: other.name }))) return;
               await fetch(`/api/users/${other.id}/block`, { method: "POST" });
               window.location.href = "/matches";
             }}
             className="text-xs font-medium border border-[#FCE8EC] rounded-full px-3.5 py-1.5 bg-white hover:bg-[#FFF0F3] transition"
           >
-            Chặn
+            {t.chat.block}
           </button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gradient-to-b from-[#FFFCFA]/50 to-[#FFF7F5]/50">
+      {reportOpen && (
+        <ReportModal
+          onClose={() => setReportOpen(false)}
+          onSubmit={async (reason, details) => {
+            if (!other) return;
+            const res = await fetch(`/api/users/${other.id}/report`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ reason, details }),
+            });
+            if (res.ok) {
+              alert((t.discover as any).reportSent ?? "Đã gửi báo cáo.");
+              setReportOpen(false);
+            } else {
+              const d = await res.json().catch(() => ({}));
+              alert(d.error || "Báo cáo thất bại");
+            }
+          }}
+        />
+      )}
+
+      <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar p-4 space-y-4 bg-gradient-to-b from-[#FFFCFA]/50 to-[#FFF7F5]/50 overscroll-contain">
         {starter && (
           <div className="rounded-[20px] bg-[#2E1A22] text-white p-5 relative overflow-hidden shadow-[0_8px_24px_rgba(46,26,34,0.14)]">
             <div className="absolute -right-6 -top-6 w-20 h-20 rounded-full bg-[#FF4D6D]/15 blur-xl" />
-            <div className="text-[10px] font-mono tracking-[0.16em] uppercase text-[#FF8FA3] font-semibold">Mở lời từ bưu thiếp</div>
+            <div className="text-[10px] font-mono tracking-[0.16em] uppercase text-[#FF8FA3] font-semibold">{t.chat.starterLabel}</div>
             <div className="font-display text-[15px] mt-2 leading-snug italic">“{starter}”</div>
           </div>
         )}
         {messages.length === 0 ? (
           <div className="text-center py-16">
             <div className="w-14 h-14 rounded-full gradient-primary text-white grid place-items-center mx-auto text-xl shadow-[0_8px_20px_rgba(255,77,109,0.3)]">✉</div>
-            <p className="text-sm font-display font-medium mt-4">Hãy viết dòng đầu tiên</p>
-            <p className="text-xs text-[#8E6B75] mt-1.5 bg-white/70 border border-[#FCE8EC] inline-block px-3 py-1.5 rounded-full">Gợi ý: nhắc lại điều bạn đã chọn trong bưu thiếp của họ.</p>
+            <p className="text-sm font-display font-medium mt-4">{t.chat.emptyTitle}</p>
+            <p className="text-xs text-[#8E6B75] mt-1.5 bg-white/70 border border-[#FCE8EC] inline-block px-3 py-1.5 rounded-full">{t.chat.emptyHint}</p>
           </div>
         ) : (
           messages.map((m) => (
@@ -124,11 +154,11 @@ export default function ChatClient({ matchId }: { matchId: string }) {
         <div ref={bottomRef} />
       </div>
 
-      <form onSubmit={send} className="border-t border-[#FCE8EC] bg-white/80 backdrop-blur-xl p-3 flex gap-2 sticky bottom-0">
+      <form onSubmit={send} className="shrink-0 border-t border-[#FCE8EC] bg-white/80 backdrop-blur-xl p-3 flex gap-2">
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder={slowInfo && slowInfo.remaining <= 0 ? "Đã hết lượt hôm nay... mai nhé 🌙" : "Viết một dòng chậm..."}
+          placeholder={slowInfo && slowInfo.remaining <= 0 ? t.chat.placeholderDisabled : t.chat.placeholder}
           disabled={!!(slowInfo && slowInfo.remaining <= 0)}
           className="flex-1 h-12 rounded-full border border-[#FCE8EC] bg-[#FFFCFA] px-5 text-sm outline-none focus:bg-white focus:border-[#FF8FA3] focus:shadow-[0_4px_16px_rgba(255,77,109,0.08)] disabled:opacity-50 transition placeholder:text-[#B08A95]"
         />
@@ -136,7 +166,35 @@ export default function ChatClient({ matchId }: { matchId: string }) {
           ↑
         </button>
       </form>
-      <div className="text-center text-[10px] font-mono text-[#B08A95] pb-4 pt-2.5 px-4 bg-white/50">Lumen chậm: 5 tin/ngày cho 48h đầu — để mỗi tin có trọng lượng. ✨</div>
+      <div className="shrink-0 text-center text-[10px] font-mono text-[#B08A95] py-2 px-4 bg-white/50">{t.chat.footer}</div>
+    </div>
+  );
+}
+
+const REPORT_REASONS = ["Fake profile", "Harassment", "Spam", "Inappropriate content", "Scam", "Other"];
+
+function ReportModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (reason: string, details: string) => void }) {
+  const [reason, setReason] = useState(REPORT_REASONS[2]);
+  const [details, setDetails] = useState("");
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-[#1A1A1E]/40 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className="w-full max-w-md rounded-[24px] bg-white p-6 space-y-4 shadow-[0_16px_40px_rgba(0,0,0,0.18)]" onClick={(e) => e.stopPropagation()}>
+        <h3 className="font-semibold text-base">Báo cáo người dùng</h3>
+        <label className="block text-xs font-medium text-[#6E4A56] space-y-1">
+          <span>Lý do</span>
+          <select value={reason} onChange={(e) => setReason(e.target.value)} className="w-full h-11 rounded-xl border border-[#FCE8EC] bg-white px-3 text-sm outline-none focus:border-[#FF8FA3]">
+            {REPORT_REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
+          </select>
+        </label>
+        <label className="block text-xs font-medium text-[#6E4A56] space-y-1">
+          <span>Chi tiết (không bắt buộc)</span>
+          <textarea value={details} onChange={(e) => setDetails(e.target.value)} rows={3} placeholder="Mô tả thêm..." className="w-full rounded-xl border border-[#FCE8EC] bg-[#FFFCFA] p-3 text-sm outline-none focus:border-[#FF8FA3] focus:bg-white resize-none" />
+        </label>
+        <div className="flex gap-2 justify-end">
+          <button onClick={onClose} className="h-10 px-5 rounded-full border border-[#FCE8EC] bg-white text-sm font-medium hover:bg-[#FFF0F3]">Hủy</button>
+          <button onClick={() => onSubmit(reason, details)} className="h-10 px-6 rounded-full bg-[#2E1A22] text-white text-sm font-semibold hover:bg-black">Gửi báo cáo</button>
+        </div>
+      </div>
     </div>
   );
 }

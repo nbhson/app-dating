@@ -9,7 +9,6 @@ export default async function AdminPage() {
   if (!userId) redirect("/");
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) redirect("/");
-  // auto-promote first user? For demo make demo@lumen.app admin if first.
-  // We'll check isAdmin else show access request
-  return <AdminClient isAdmin={!!user.isAdmin} />;
+  if (!user.isAdmin) redirect("/discover");
+  return <AdminClient isAdmin={true} />;
 }

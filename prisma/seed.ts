@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
@@ -49,6 +50,7 @@ function randomAge() { return 22 + Math.floor(Math.random()*12); }
 
 async function main() {
   console.log("Seeding...");
+  const demoPasswordHash = await bcrypt.hash("Lumen123!", 10);
   // Demo users chỉ tạo khi SEED_DEMO=1 — mặc định giữ DB sạch, chỉ user đăng ký thật mới hiện ở Bưu thiếp
   if (process.env.SEED_DEMO === "1") {
   for (let i=0; i<35; i++) {
@@ -58,8 +60,10 @@ async function main() {
     let user = await prisma.user.findUnique({ where: { email }});
     if (!user) {
       user = await prisma.user.create({
-        data: { email, name, status: "ACTIVE", isAdmin: i===0, lastActiveAt: new Date(Date.now() - Math.random()*7*24*60*60*1000) },
+        data: { email, name, passwordHash: demoPasswordHash, status: "ACTIVE", isAdmin: i===0, lastActiveAt: new Date(Date.now() - Math.random()*7*24*60*60*1000) },
       });
+    } else if (!user.passwordHash) {
+      user = await prisma.user.update({ where: { id: user.id }, data: { passwordHash: demoPasswordHash } });
     }
     const age = randomAge();
     const dob = new Date();
@@ -153,7 +157,7 @@ async function main() {
     }
   }
 
-  console.log("Seed done. " + (process.env.SEED_DEMO === "1" ? "Admin: demo1@lumen.app" : "SEED_DEMO!=1 nên không tạo demo users — chỉ giữ user đăng ký thật"));
+  console.log("Seed done. " + (process.env.SEED_DEMO === "1" ? "Admin: demo1@lumen.app / Lumen123!" : "SEED_DEMO!=1 nên không tạo demo users — chỉ giữ user đăng ký thật"));
 }
 
 main().then(()=>process.exit(0)).catch(e=>{console.error(e); process.exit(1)});

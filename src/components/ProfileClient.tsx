@@ -1,17 +1,12 @@
 "use client";
 import { useState } from "react";
 import { signOut } from "next-auth/react";
-
-const promptQs = [
-  "Điều khiến mình tò mò gần đây",
-  "Một ngày Chủ Nhật hoàn hảo",
-  "Cách mình thể hiện sự quan tâm",
-  "Điều mình đang học về bản thân",
-  "Chuyến đi khiến mình thay đổi",
-  "Mình muốn được hiểu điều gì ngay từ đầu",
-];
+import { useI18n } from "@/lib/i18n/context";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 export default function ProfileClient({ user }: { user: any }) {
+  const { t, trans, locale } = useI18n();
+  const promptQs = (t.profile.promptQuestions as unknown as string[]) ?? [];
   const [form, setForm] = useState({
     bio: user.profile?.bio ?? "",
     occupation: user.profile?.occupation ?? "",
@@ -32,7 +27,7 @@ export default function ProfileClient({ user }: { user: any }) {
   );
   const [geoStatus, setGeoStatus] = useState<string | null>(null);
   const [prompts, setPrompts] = useState<any[]>(user.promptAnswers ?? []);
-  const [newPromptQ, setNewPromptQ] = useState(promptQs[0]);
+  const [newPromptQ, setNewPromptQ] = useState(promptQs[0] ?? "");
   const [newPromptA, setNewPromptA] = useState("");
   const [photos, setPhotos] = useState<any[]>(user.photos ?? []);
   const [saving, setSaving] = useState(false);
@@ -44,11 +39,11 @@ export default function ProfileClient({ user }: { user: any }) {
   if (dailyQ === null) { fetch("/api/daily-answer").then(r=>r.json()).then(d=>{ setDailyQ(d.question); setDailyA(d.answer??"");}).catch(()=>{}); }
 
   async function requestGeo(){
-    if(!navigator.geolocation){ setGeoStatus("Trình duyệt không hỗ trợ định vị"); return; }
-    setGeoStatus("Đang lấy vị trí...");
+    if(!navigator.geolocation){ setGeoStatus(t.profile.geoNotSupported); return; }
+    setGeoStatus(t.profile.fetchingLocation);
     navigator.geolocation.getCurrentPosition(
-      pos=>{ setCoords({lat:pos.coords.latitude, lng:pos.coords.longitude}); setGeoStatus(`Đã lấy ~ ${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)} (±${Math.round(pos.coords.accuracy)}m)`); },
-      err=> setGeoStatus("Lỗi: "+err.message),
+      pos=>{ setCoords({lat:pos.coords.latitude, lng:pos.coords.longitude}); setGeoStatus(trans("profile.fetchedLocation", { lat: pos.coords.latitude.toFixed(4), lng: pos.coords.longitude.toFixed(4), acc: String(Math.round(pos.coords.accuracy)) })); },
+      err=> setGeoStatus(trans("profile.fetchError", { msg: err.message })),
       { enableHighAccuracy:false, timeout:8000 }
     );
   }
@@ -64,7 +59,7 @@ export default function ProfileClient({ user }: { user: any }) {
       await fetch("/api/daily-answer", { method: "POST", headers: { "Content-Type":"application/json" }, body: JSON.stringify({ answer: dailyA }) });
     }
     setSaving(false);
-    alert("Đã lưu ✨");
+    alert(t.profile.saved);
   }
 
   async function upload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -75,7 +70,7 @@ export default function ProfileClient({ user }: { user: any }) {
     const res = await fetch("/api/profile/photos", { method: "POST", body: fd });
     const data = await res.json();
     if (res.ok) setPhotos((p) => [...p, data.photo]);
-    else alert(data.error);
+    else alert(data.error ?? t.profile.uploadError);
   }
 
   async function addPrompt() {
@@ -86,19 +81,24 @@ export default function ProfileClient({ user }: { user: any }) {
     else alert(d.error);
   }
 
-  const inputClass = "w-full h-11 rounded-2xl border border-[#FCE8EC] px-4 bg-white/70 focus:bg-white focus:border-[#FF8FA3] outline-none text-sm transition placeholder:text-[#B08A95]";
-  const card = "glass-strong rounded-[28px] p-6 space-y-4 relative overflow-hidden";
+  const inputClass = "w-full h-10 md:h-11 rounded-2xl border border-[#FCE8EC] px-3 md:px-4 bg-white/70 focus:bg-white focus:border-[#FF8FA3] outline-none text-sm transition placeholder:text-[#B08A95]";
+  const card = "glass-strong rounded-[24px] md:rounded-[28px] p-4 md:p-6 space-y-3 md:space-y-4 relative overflow-hidden shrink-0";
 
   return (
-    <div className="max-w-2xl mx-auto w-full p-4 md:p-6 pb-28 space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="font-display text-[26px] font-medium flex items-center gap-2">Hồ sơ bưu thiếp <span className="text-[#FF8FA3]">♥</span></h1>
-        <button onClick={() => signOut({ callbackUrl: "/" })} className="text-sm font-medium border border-[#FCE8EC] rounded-full px-4 py-2 bg-white hover:bg-[#FFF0F3] transition">Đăng xuất</button>
+    <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+      <div className="shrink-0 flex items-center justify-between px-4 md:px-6 pt-4 md:pt-5 pb-3 bg-transparent">
+        <h1 className="font-display text-[22px] md:text-[26px] font-medium flex items-center gap-2">{t.profile.title} <span className="text-[#FF8FA3]">♥</span></h1>
+        <div className="flex items-center gap-2">
+          <LanguageSwitcher variant="compact" />
+          <button onClick={() => signOut({ callbackUrl: "/" })} className="text-sm font-medium border border-[#FCE8EC] rounded-full px-4 py-2 bg-white hover:bg-[#FFF0F3] transition">{t.profile.logout}</button>
+        </div>
       </div>
+      <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar overscroll-contain">
+        <div className="max-w-2xl mx-auto w-full px-4 md:px-6 pb-[88px] md:pb-4 space-y-4 md:space-y-5">
 
       <div className={card}>
         <div className="absolute -right-8 -top-8 w-24 h-24 rounded-full bg-[#FF8FA3]/10 blur-2xl pointer-events-none" />
-        <h2 className="font-semibold flex items-center gap-2">Ảnh <span className="text-xs font-mono bg-[#FFF0F3] border border-[#FCE8EC] px-2 py-1 rounded-full text-[#8E6B75]">{photos.length}/6</span> <span className="ml-auto text-xs text-[#B08A95]">Chạm ✕ để xóa</span></h2>
+        <h2 className="font-semibold flex items-center gap-2">{t.profile.photos} <span className="text-xs font-mono bg-[#FFF0F3] border border-[#FCE8EC] px-2 py-1 rounded-full text-[#8E6B75]">{photos.length}/6</span> <span className="ml-auto text-xs text-[#B08A95]">{t.profile.tapToDelete}</span></h2>
         <div className="grid grid-cols-3 gap-3">
           {photos.map((p) => (
             <div key={p.id} className="aspect-[3/4] rounded-[20px] overflow-hidden bg-[#FFE8EC] relative border border-white shadow-sm group">
@@ -119,17 +119,17 @@ export default function ProfileClient({ user }: { user: any }) {
           {photos.length < 6 && (
             <label className="aspect-[3/4] rounded-[20px] border-2 border-dashed border-[#FCE8EC] grid place-items-center bg-white/60 hover:bg-white cursor-pointer transition group">
               <input type="file" accept="image/*" className="hidden" onChange={upload} />
-              <span className="text-sm text-[#8E6B75] flex flex-col items-center gap-1 group-hover:text-[#FF4D6D] transition"><span className="w-8 h-8 rounded-full bg-[#FFF0F3] border border-[#FCE8EC] grid place-items-center text-lg">+</span> Tải ảnh</span>
+              <span className="text-sm text-[#8E6B75] flex flex-col items-center gap-1 group-hover:text-[#FF4D6D] transition"><span className="w-8 h-8 rounded-full bg-[#FFF0F3] border border-[#FCE8EC] grid place-items-center text-lg">+</span> {t.profile.uploadPhoto}</span>
             </label>
           )}
         </div>
         <div className="rounded-2xl border border-[#FCE8EC] bg-gradient-to-br from-[#FFF0F3] to-white p-4 flex items-center gap-3">
           <span className="w-8 h-8 rounded-full gradient-primary grid place-items-center text-white text-xs shrink-0">♪</span>
-          <span className="text-sm font-semibold">Voice 15s</span>
+          <span className="text-sm font-semibold">{t.profile.voice}</span>
           {voiceUrl ? (
             <>
               <audio controls src={voiceUrl} className="flex-1 h-8 rounded-full" />
-              <button onClick={async()=>{ await fetch("/api/profile/voice",{method:"DELETE"}); setVoiceUrl(null);}} className="text-xs font-medium underline text-[#8E6B75]">Xóa</button>
+              <button onClick={async()=>{ await fetch("/api/profile/voice",{method:"DELETE"}); setVoiceUrl(null);}} className="text-xs font-medium underline text-[#8E6B75]">{t.profile.deleteVoice}</button>
             </>
           ) : (
             <label className="ml-auto text-xs font-semibold border border-[#FCE8EC] rounded-full px-4 py-2 bg-white hover:bg-[#FFF0F3] cursor-pointer transition">
@@ -138,35 +138,35 @@ export default function ProfileClient({ user }: { user: any }) {
                 const fd=new FormData(); fd.append("file", f); fd.append("duration","15");
                 const r=await fetch("/api/profile/voice",{method:"POST", body:fd}); const d=await r.json(); if(r.ok) setVoiceUrl(d.url);
               }} />
-              Tải voice
+              {t.profile.uploadVoice}
             </label>
           )}
         </div>
       </div>
 
       <div className={card}>
-        <h2 className="font-semibold flex items-center gap-2"><span className="w-7 h-7 rounded-full bg-[#2E1A22] text-white grid place-items-center text-xs">✦</span> Câu hỏi hôm nay</h2>
+        <h2 className="font-semibold flex items-center gap-2"><span className="w-7 h-7 rounded-full bg-[#2E1A22] text-white grid place-items-center text-xs">✦</span> {t.profile.dailyQuestion}</h2>
         {dailyQ ? (
           <div className="space-y-3">
             <div className="rounded-2xl bg-[#2E1A22] text-white p-4 relative overflow-hidden">
               <div className="absolute -right-6 -top-6 w-16 h-16 rounded-full bg-[#FF4D6D]/15 blur-xl" />
               <div className="text-sm font-display italic relative">“{dailyQ}”</div>
             </div>
-            <textarea value={dailyA} onChange={(e)=>setDailyA(e.target.value)} rows={2} placeholder="Viết 1–2 câu, sẽ hiện trong bưu thiếp hôm nay..." className="w-full rounded-2xl border border-[#FCE8EC] p-3.5 bg-white/70 focus:bg-white focus:border-[#FF8FA3] outline-none text-sm placeholder:text-[#B08A95] transition" maxLength={300} />
-            <div className="text-[11px] font-mono text-[#B08A95] flex items-center gap-2"><span className={`${dailyA.length>0?"text-emerald-500":""} font-semibold`}>{dailyA.length}/300</span> — trả lời hôm nay để người khác thấy bạn đang nghĩ gì ✨</div>
+            <textarea value={dailyA} onChange={(e)=>setDailyA(e.target.value)} rows={2} placeholder={t.profile.dailyPlaceholder} className="w-full rounded-2xl border border-[#FCE8EC] p-3.5 bg-white/70 focus:bg-white focus:border-[#FF8FA3] outline-none text-sm placeholder:text-[#B08A95] transition" maxLength={300} />
+            <div className="text-[11px] font-mono text-[#B08A95] flex items-center gap-2"><span className={`${dailyA.length>0?"text-emerald-500":""} font-semibold`}>{dailyA.length}/300</span> — {t.profile.answeringHint}</div>
           </div>
-        ) : <div className="text-sm text-[#8E6B75]">Đang tải...</div>}
+        ) : <div className="text-sm text-[#8E6B75]">{t.profile.loadingDaily}</div>}
       </div>
 
       <div className={card}>
-        <h2 className="font-semibold">Lời tự sự <span className="text-xs font-mono text-[#FF4D6D] bg-[#FFF0F3] border border-[#FCE8EC] px-2 py-1 rounded-full">{prompts.length}/3</span></h2>
+        <h2 className="font-semibold">{t.profile.prompts} <span className="text-xs font-mono text-[#FF4D6D] bg-[#FFF0F3] border border-[#FCE8EC] px-2 py-1 rounded-full">{prompts.length}/3</span></h2>
         {prompts.map((p:any)=> (
           <div key={p.id} className="rounded-2xl border border-[#FCE8EC] bg-white p-4 flex justify-between gap-3 shadow-sm">
             <div>
               <div className="text-[11px] font-mono tracking-[0.12em] uppercase text-[#FF4D6D] font-semibold">{p.question}</div>
               <div className="text-sm font-display mt-1.5 leading-snug">{p.answer}</div>
             </div>
-            <button onClick={async()=>{ await fetch(`/api/prompts?id=${p.id}`,{method:"DELETE"}); setPrompts(prev=>prev.filter((x:any)=>x.id!==p.id));}} className="text-xs font-medium underline text-[#8E6B75] shrink-0 hover:text-[#FF4D6D]">Xóa</button>
+            <button onClick={async()=>{ await fetch(`/api/prompts?id=${p.id}`,{method:"DELETE"}); setPrompts(prev=>prev.filter((x:any)=>x.id!==p.id));}} className="text-xs font-medium underline text-[#8E6B75] shrink-0 hover:text-[#FF4D6D]">{t.profile.deletePromptBtn}</button>
           </div>
         ))}
         {prompts.length < 3 && (
@@ -174,36 +174,36 @@ export default function ProfileClient({ user }: { user: any }) {
             <select value={newPromptQ} onChange={(e)=>setNewPromptQ(e.target.value)} className={inputClass}>
               {promptQs.map(q=><option key={q} value={q}>{q}</option>)}
             </select>
-            <textarea value={newPromptA} onChange={(e)=>setNewPromptA(e.target.value)} rows={2} placeholder="Trả lời chân thành, mềm mại..." className="w-full rounded-2xl border border-[#FCE8EC] p-3.5 text-sm bg-white/70 focus:bg-white focus:border-[#FF8FA3] outline-none placeholder:text-[#B08A95] transition" maxLength={300} />
-            <button onClick={addPrompt} disabled={!newPromptA.trim()} className="h-10 px-5 rounded-full bg-[#2E1A22] text-white text-xs font-semibold disabled:opacity-40 hover:bg-[#1F1218] transition">Thêm lời tự sự →</button>
+            <textarea value={newPromptA} onChange={(e)=>setNewPromptA(e.target.value)} rows={2} placeholder={t.profile.promptPlaceholder} className="w-full rounded-2xl border border-[#FCE8EC] p-3.5 text-sm bg-white/70 focus:bg-white focus:border-[#FF8FA3] outline-none placeholder:text-[#B08A95] transition" maxLength={300} />
+            <button onClick={addPrompt} disabled={!newPromptA.trim()} className="h-10 px-5 rounded-full bg-[#2E1A22] text-white text-xs font-semibold disabled:opacity-40 hover:bg-[#1F1218] transition">{t.profile.addPrompt}</button>
           </div>
         )}
       </div>
 
       <div className={card}>
-        <h2 className="font-semibold flex items-center gap-2">Thông tin <span className="ml-auto text-[11px] font-mono text-[#B08A95]">Hiển thị trên bưu thiếp</span></h2>
-        <input value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} placeholder="Tên hiển thị" className={inputClass} />
-        <input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="Nơi ở — ví dụ: Thảo Điền, Q2" className={inputClass} />
+        <h2 className="font-semibold flex items-center gap-2">{t.profile.info} <span className="ml-auto text-[11px] font-mono text-[#B08A95]">{t.profile.shownOnCard}</span></h2>
+        <input value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} placeholder={t.profile.displayName} className={inputClass} />
+        <input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder={t.profile.location} className={inputClass} />
         <div className="flex flex-wrap items-center gap-2">
-          <button type="button" onClick={requestGeo} className="text-xs font-semibold border border-[#FCE8EC] rounded-full px-4 py-2 bg-white hover:bg-[#FFF0F3] transition">📍 Cập nhật vị trí thật</button>
-          {coords && <span className="text-[11px] font-mono bg-white border border-[#FCE8EC] px-2.5 py-1 rounded-full text-[#8E6B75]">{coords.lat.toFixed(3)}, {coords.lng.toFixed(3)} <button onClick={()=>setCoords(null)} className="underline ml-1 hover:text-[#FF4D6D]">Xóa</button></span>}
+          <button type="button" onClick={requestGeo} className="text-xs font-semibold border border-[#FCE8EC] rounded-full px-4 py-2 bg-white hover:bg-[#FFF0F3] transition">{t.profile.updateLocation}</button>
+          {coords && <span className="text-[11px] font-mono bg-white border border-[#FCE8EC] px-2.5 py-1 rounded-full text-[#8E6B75]">{coords.lat.toFixed(3)}, {coords.lng.toFixed(3)} <button onClick={()=>setCoords(null)} className="underline ml-1 hover:text-[#FF4D6D]">{t.profile.remove}</button></span>}
         </div>
         {geoStatus && <div className="text-[11px] font-mono text-[#FF4D6D] bg-[#FFF0F3] border border-[#FCE8EC] px-3 py-2 rounded-xl">{geoStatus}</div>}
-        <div className="text-[11px] text-[#B08A95] bg-[#FFFCFA] border border-[#FCE8EC]/50 rounded-xl px-3 py-2">Khoảng cách hiện làm mờ (“~ 3 km • vị trí thật”). Không chia sẻ sẽ hiện “Khoảng cách ẩn”.</div>
-        <textarea value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} placeholder="Bio — như một bưu thiếp mềm mại, nói về bạn..." rows={3} className="w-full rounded-2xl border border-[#FCE8EC] p-3.5 bg-white/70 focus:bg-white focus:border-[#FF8FA3] outline-none text-sm placeholder:text-[#B08A95] transition" />
+        <div className="text-[11px] text-[#B08A95] bg-[#FFFCFA] border border-[#FCE8EC]/50 rounded-xl px-3 py-2">{t.profile.distanceHint}</div>
+        <textarea value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} placeholder={t.profile.bioPlaceholder} rows={3} className="w-full rounded-2xl border border-[#FCE8EC] p-3.5 bg-white/70 focus:bg-white focus:border-[#FF8FA3] outline-none text-sm placeholder:text-[#B08A95] transition" />
         <div className="grid grid-cols-2 gap-3">
-          <input value={form.occupation} onChange={(e) => setForm({ ...form, occupation: e.target.value })} placeholder="Nghề nghiệp" className={inputClass} />
-          <input value={form.education} onChange={(e) => setForm({ ...form, education: e.target.value })} placeholder="Học vấn" className={inputClass} />
+          <input value={form.occupation} onChange={(e) => setForm({ ...form, occupation: e.target.value })} placeholder={t.profile.occupation} className={inputClass} />
+          <input value={form.education} onChange={(e) => setForm({ ...form, education: e.target.value })} placeholder={t.profile.education} className={inputClass} />
         </div>
       </div>
 
       <div className={card}>
-        <h2 className="font-semibold">Bạn tìm gì</h2>
+        <h2 className="font-semibold">{t.profile.preferences}</h2>
         <div className="grid grid-cols-3 gap-2">
           {[
-            ["MEN", "Nam"],
-            ["WOMEN", "Nữ"],
-            ["EVERYONE", "Tất cả"],
+            ["MEN", t.profile.men],
+            ["WOMEN", t.profile.women],
+            ["EVERYONE", t.profile.everyone],
           ].map(([v, l]) => (
             <button key={v} onClick={() => setPref({ ...pref, interestedIn: v })} className={`h-11 rounded-2xl border text-sm font-semibold transition ${pref.interestedIn === v ? "bg-[#2E1A22] text-white border-[#2E1A22] shadow-[0_4px_12px_rgba(46,26,34,0.15)]" : "bg-white border-[#FCE8EC] text-[#8E6B75] hover:border-[#FFD6DE]"}`}>
               {l}
@@ -212,39 +212,39 @@ export default function ProfileClient({ user }: { user: any }) {
         </div>
         <div className="flex flex-wrap gap-2">
           {[
-            ["LONG_TERM","Lâu dài"],
-            ["SHORT_TERM","Nhẹ nhàng"],
-            ["FRIENDSHIP","Bạn"],
-            ["EXPLORING","Khám phá"],
-            ["UNSURE","Chưa biết"],
+            ["LONG_TERM", t.profile.intentLong],
+            ["SHORT_TERM", t.profile.intentShort],
+            ["FRIENDSHIP", t.profile.intentFriend],
+            ["EXPLORING", t.profile.intentExploring],
+            ["UNSURE", t.profile.intentUnsure],
           ].map(([v,l])=>(
             <button key={v} onClick={()=>setPref({...pref, intent:v})} className={`px-4 py-2 rounded-full text-xs font-semibold border transition ${pref.intent===v ? "gradient-primary text-white border-transparent shadow-[0_4px_12px_rgba(255,77,109,0.25)]" : "bg-white border-[#FCE8EC] text-[#8E6B75] hover:border-[#FFD6DE]"}`}>{l}</button>
           ))}
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <label className="text-sm font-medium">Từ <input type="number" value={pref.minAge} onChange={(e) => setPref({ ...pref, minAge: Number(e.target.value) })} className={`${inputClass} mt-1.5`} /></label>
-          <label className="text-sm font-medium">Đến <input type="number" value={pref.maxAge} onChange={(e) => setPref({ ...pref, maxAge: Number(e.target.value) })} className={`${inputClass} mt-1.5`} /></label>
+          <label className="text-sm font-medium">{t.profile.minAge} <input type="number" value={pref.minAge} onChange={(e) => setPref({ ...pref, minAge: Number(e.target.value) })} className={`${inputClass} mt-1.5`} /></label>
+          <label className="text-sm font-medium">{t.profile.maxAge} <input type="number" value={pref.maxAge} onChange={(e) => setPref({ ...pref, maxAge: Number(e.target.value) })} className={`${inputClass} mt-1.5`} /></label>
         </div>
         <label className="space-y-2 block">
-          <span className="text-sm font-semibold flex items-center gap-2">Bán kính: <span className="text-[#FF4D6D]">{pref.maxDistance} km</span> <span className="ml-auto text-xs font-mono text-[#B08A95]">5 — 200 km</span></span>
+          <span className="text-sm font-semibold flex items-center gap-2">{trans("profile.radius", { value: pref.maxDistance })} <span className="ml-auto text-xs font-mono text-[#B08A95]">{t.profile.radiusHint}</span></span>
           <input type="range" min={5} max={200} step={5} value={pref.maxDistance} onChange={(e)=>setPref({...pref, maxDistance:Number(e.target.value)})} className="w-full accent-[#FF4D6D]" />
         </label>
       </div>
 
       <button onClick={save} disabled={saving} className="w-full h-[52px] rounded-full btn-primary font-semibold disabled:opacity-50 shadow-[0_8px_20px_rgba(255,77,109,0.28)]">
-        {saving ? "Đang lưu..." : "Lưu thay đổi ✨"}
+        {saving ? t.profile.saving : t.profile.saveChanges}
       </button>
 
       <div className="glass rounded-[24px] p-6 space-y-3 border border-red-100">
-        <h2 className="font-semibold text-[#8E2C3A] flex items-center gap-2">Tài khoản <span className="text-xs font-mono bg-red-50 border border-red-200 px-2 py-1 rounded-full">Nguy hiểm</span></h2>
-        <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-xs text-red-700 leading-relaxed">Khu vực nguy hiểm — xóa sẽ ẩn hồ sơ và chặn đăng nhập lại bằng email này.</div>
+        <h2 className="font-semibold text-[#8E2C3A] flex items-center gap-2">{t.profile.dangerZone} <span className="text-xs font-mono bg-red-50 border border-red-200 px-2 py-1 rounded-full">{t.profile.dangerBadge}</span></h2>
+        <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-xs text-red-700 leading-relaxed">{t.profile.dangerDesc}</div>
         <button
           onClick={async () => {
-            if (!confirm("Bạn chắc chắn muốn XÓA tài khoản? Hành động này sẽ ẩn hồ sơ.")) return;
-            const typed = prompt(`Gõ email của bạn (${user.email}) để xác nhận xóa:`);
+            if (!confirm(t.profile.deleteConfirm)) return;
+            const typed = prompt(trans("profile.deleteAccountPrompt", { email: user.email }));
             if (typed === null) return;
             if (typed.trim().toLowerCase() !== user.email.toLowerCase()) {
-              alert("Email không khớp — đã hủy xóa.");
+              alert(t.profile.deleteMismatch);
               return;
             }
             await fetch("/api/profile/me", { method: "DELETE" });
@@ -252,15 +252,17 @@ export default function ProfileClient({ user }: { user: any }) {
           }}
           className="w-full h-11 rounded-full border border-red-200 text-red-600 bg-red-50 hover:bg-red-100 font-semibold text-sm transition"
         >
-          Xóa tài khoản
+          {t.profile.deleteAccount}
         </button>
         <div className="text-[11px] font-mono text-[#B08A95] text-center">
-          Email: {user.email} · ID: {user.id.slice(0, 8)}
+          {trans("profile.accountMeta", { email: user.email, id: user.id.slice(0, 8) })}
         </div>
       </div>
 
       <div className="text-center text-xs font-mono text-[#B08A95] pb-2">
-        <a href="/admin" className="hover:text-[#2E1A22] hover:underline">Admin</a> · <a href="/privacy" className="hover:text-[#2E1A22] hover:underline">Privacy</a> · Lumen ♥
+        <a href="/admin" className="hover:text-[#2E1A22] hover:underline">{t.profile.adminLink}</a> · <a href="/privacy" className="hover:text-[#2E1A22] hover:underline">{t.common.privacy}</a> · Lumen ♥
+      </div>
+        </div>
       </div>
     </div>
   );

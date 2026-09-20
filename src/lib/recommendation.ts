@@ -34,6 +34,7 @@ export class SimpleRecommendationEngine implements RecommendationEngine {
     const allCandidates = await prisma.user.findMany({
       where: {
         status: "ACTIVE",
+        isAdmin: false,
         id: { notIn: Array.from(excluded) },
         profile: { isNot: null },
       },

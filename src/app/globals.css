@@ -39,6 +39,12 @@
 
 * { scrollbar-width: thin; scrollbar-color: #E8C4CC transparent; }
 
+html, body {
+  height: 100dvh;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
@@ -46,6 +52,14 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   overflow-x: hidden;
+  overflow-y: hidden;
+}
+
+/* viewport-fit helper: all main pages must stay inside 100dvh without page scroll */
+.viewport-lock {
+  height: 100dvh;
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 /* === MESH GRADIENT BACKGROUND — Dating adaptation of YT floating orbs === */
@@ -208,9 +222,14 @@ body::after {
   }
 }
 
-/* hide scrollbar but keep scroll */
+/* hide scrollbar but keep scroll - used for inner panels when needed, but outer page stays locked */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ensure no vertical page scroll - inner panels handle their own overflow hidden */
+@media (max-width: 768px) {
+  html, body { height: 100dvh; max-height: 100dvh; }
+}
 
 /* focus */
 *:focus-visible {

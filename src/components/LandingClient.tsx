@@ -3,43 +3,62 @@ import { signIn } from "next-auth/react";
 import { useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { useI18n } from "@/lib/i18n/context";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 export default function LandingClient() {
+  const { t, trans } = useI18n();
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   async function demoLogin(e: React.FormEvent) {
     e.preventDefault();
-    if (!email) return;
+    setError("");
+    if (!email || !password) {
+      setError(t.landing.invalidCredentials);
+      return;
+    }
+    if (password.length < 8) {
+      setError((t.landing as any).passwordTooShort || "Mật khẩu phải ít nhất 8 ký tự");
+      return;
+    }
     setLoading(true);
-    await signIn("credentials", { email, callbackUrl: "/discover" });
+    const res = await signIn("credentials", { email, password, redirect: false });
     setLoading(false);
+    if (res?.error) {
+      setError((t.landing as any).invalidCredentials || "Sai email hoặc mật khẩu");
+    } else if (res?.ok) {
+      window.location.href = "/discover";
+    }
   }
 
   return (
-    <div className="min-h-screen flex flex-col relative overflow-hidden">
+    <div className="min-h-screen min-h-[100dvh] flex flex-col relative overflow-x-hidden overflow-y-auto bg-[#FFF7F5]">
       {/* soft aura orbs behind — now with YT-inspired drift adapted for dating */}
-      <div className="aura aura-peach w-[520px] h-[520px] -top-24 -left-24 opacity-40 animate-aura-drift" />
-      <div className="aura aura-lavender w-[700px] h-[500px] top-0 right-0 opacity-40 animate-aura-drift-slow" />
+      <div className="aura aura-peach w-[520px] h-[520px] -top-24 -left-24 opacity-40 animate-aura-drift pointer-events-none" />
+      <div className="aura aura-lavender w-[700px] h-[500px] top-0 right-0 opacity-40 animate-aura-drift-slow pointer-events-none" />
 
       <div className="flex-1 grid lg:grid-cols-[1.05fr_0.95fr] max-w-[1280px] mx-auto w-full relative">
         {/* LEFT */}
-        <div className="flex flex-col p-6 sm:p-8 md:p-10 lg:p-12 xl:p-14 justify-between gap-10 relative">
+        <div className="flex flex-col p-6 sm:p-8 md:p-10 lg:p-12 xl:p-14 gap-6 lg:gap-8 relative">
           {/* header */}
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl gradient-primary flex items-center justify-center text-white shadow-[0_8px_20px_rgba(255,77,109,0.3)]">
               <span className="text-[18px] leading-none -mt-0.5">♥</span>
             </div>
             <div>
-              <div className="font-display text-[20px] leading-none font-semibold tracking-tight">Lumen</div>
-              <div className="text-[10px] font-mono tracking-[0.16em] uppercase text-[#8E6B75]">Letters, not swipes</div>
+              <div className="font-display text-[20px] leading-none font-semibold tracking-tight">{t.common.appName}</div>
+              <div className="text-[10px] font-mono tracking-[0.16em] uppercase text-[#8E6B75]">{t.common.tagline}</div>
             </div>
             <span className="ml-auto hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full glass text-[11px] font-medium text-[#8E6B75]">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#FF4D6D] animate-pulse-soft" /> 2.4k đang viết thư
+              <span className="w-1.5 h-1.5 rounded-full bg-[#FF4D6D] animate-pulse-soft" /> {t.landing.onlineNow}
             </span>
+            <LanguageSwitcher variant="compact" className="ml-1 hidden sm:inline-flex" />
           </div>
 
-          <div className="max-w-[560px] mx-auto w-full flex flex-col gap-8 py-2 lg:py-6">
+          <div className="max-w-[560px] mx-auto w-full flex flex-col gap-5 lg:gap-6 py-2 lg:py-4">
             {/* pill */}
             <motion.div
               initial={{ opacity: 0, y: 8 }}
@@ -47,24 +66,24 @@ export default function LandingClient() {
               className="inline-flex self-start items-center gap-2.5 px-4 py-2 rounded-full glass text-[12px] font-medium text-[#6E4A56]"
             >
               <span className="w-7 h-7 rounded-full gradient-primary grid place-items-center text-white text-[11px] shadow-sm">✦</span>
-              Không vuốt · Chỉ đọc · Chỉ cảm nhận
+              {t.landing.badge}
               <span className="hidden sm:inline w-px h-4 bg-[#F3DDE2] ml-1" />
-              <span className="hidden sm:inline text-[#FF4D6D] font-semibold">Mềm mại & thật lòng</span>
+              <span className="hidden sm:inline text-[#FF4D6D] font-semibold">{t.landing.badgeSub}</span>
             </motion.div>
 
             <div className="space-y-5">
               <h1 className="font-display text-[42px] sm:text-[48px] lg:text-[56px] font-[300] tracking-[-0.04em] leading-[0.88] text-[#2E1A22]">
-                Tình cảm
+                {t.landing.title1}
                 <br />
-                <span className="font-[400] italic text-gradient">viết chậm.</span>
+                <span className="font-[400] italic text-gradient">{t.landing.title2}</span>
               </h1>
               <p className="text-[#8E6B75] leading-relaxed text-[15.5px] max-w-[46ch] font-[400]">
-                Mỗi ngày <span className="font-semibold text-[#2E1A22]">20 bưu thiếp</span> — như những lá thư tay ấm áp. Ảnh mờ hé mở, lời tự sự chân thành, và một câu hỏi chung để bạn bắt đầu bằng một dòng thật lòng.
+                {t.landing.desc}
               </p>
               <div className="flex flex-wrap gap-2">
-                <span className="px-3.5 py-2 rounded-full gradient-primary text-white text-xs font-semibold shadow-[0_4px_16px_rgba(255,77,109,0.25)]">20 / ngày · chậm mà sâu</span>
-                <span className="px-3.5 py-2 rounded-full glass text-xs font-medium text-[#6E4A56]">Kèm lời nhắn mới được thích</span>
-                <span className="px-3.5 py-2 rounded-full glass text-xs font-medium text-[#6E4A56] flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[#FF4D6D] animate-pulse" /> Voice 15s</span>
+                <span className="px-3.5 py-2 rounded-full gradient-primary text-white text-xs font-semibold shadow-[0_4px_16px_rgba(255,77,109,0.25)]">{t.landing.perDay}</span>
+                <span className="px-3.5 py-2 rounded-full glass text-xs font-medium text-[#6E4A56]">{t.landing.needMessage}</span>
+                <span className="px-3.5 py-2 rounded-full glass text-xs font-medium text-[#6E4A56] flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[#FF4D6D] animate-pulse" /> {t.landing.voice}</span>
               </div>
             </div>
 
@@ -78,7 +97,7 @@ export default function LandingClient() {
                 <span className="w-6 h-6 rounded-full bg-white border border-[#F3DDE2] grid place-items-center shadow-sm">
                   <span className="w-3 h-3 rounded-full bg-[conic-gradient(from_0deg,#4285F4_0_25%,#EA4335_25%_50%,#FBBC05_50%_75%,#34A853_75%_100%)]" />
                 </span>
-                Tiếp tục với Google
+                {t.landing.continueGoogle}
               </motion.button>
               <motion.button
                 whileHover={{ y: -1 }}
@@ -86,51 +105,66 @@ export default function LandingClient() {
                 onClick={() => signIn("apple", { callbackUrl: "/discover" })}
                 className="w-full h-[52px] rounded-full bg-[#2E1A22] text-white hover:bg-[#1F1218] flex items-center justify-center gap-2.5 font-medium text-[14px] transition shadow-[0_8px_24px_rgba(46,26,34,0.18)]"
               >
-                <span className="text-[17px] -mt-0.5"></span> Tiếp tục với Apple
+                <span className="text-[17px] -mt-0.5"></span> {t.landing.continueApple}
               </motion.button>
 
               <div className="relative py-3">
                 <div className="absolute inset-0 flex items-center"><div className="w-full h-px bg-gradient-to-r from-transparent via-[#F3DDE2] to-transparent" /></div>
-                <div className="relative flex justify-center"><span className="bg-[#FFF7F5] px-4 text-xs font-mono text-[#B08A95] rounded-full border border-[#FCE8EC] py-1">hoặc thử nhanh</span></div>
+                <div className="relative flex justify-center"><span className="bg-[#FFF7F5] px-4 text-xs font-mono text-[#B08A95] rounded-full border border-[#FCE8EC] py-1">{t.landing.orQuick}</span></div>
               </div>
 
-              <form onSubmit={demoLogin} className="flex gap-2 p-1.5 rounded-full glass-strong">
-                <input
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="demo@lumen.app"
-                  type="email"
-                  className="flex-1 h-11 rounded-full bg-white/80 border border-[#FCE8EC] px-5 text-sm outline-none focus:border-[#FF8FA3] focus:bg-white placeholder:text-[#B08A95] transition"
-                />
-                <button disabled={loading} className="h-11 px-7 rounded-full btn-primary font-semibold text-sm shrink-0 disabled:opacity-50">
-                  {loading ? "…" : "Vào →"}
-                </button>
+              <form onSubmit={demoLogin} className="space-y-2">
+                <div className="flex flex-col gap-2 p-1.5 rounded-[28px] glass-strong">
+                  <input
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder={(t.landing as any).emailPlaceholder || "demo@lumen.app"}
+                    type="email"
+                    required
+                    className="w-full h-11 rounded-full bg-white/80 border border-[#FCE8EC] px-5 text-sm outline-none focus:border-[#FF8FA3] focus:bg-white placeholder:text-[#B08A95] transition"
+                  />
+                  <div className="flex gap-2">
+                    <input
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder={(t.landing as any).passwordPlaceholder || "Mật khẩu (tối thiểu 8 ký tự)"}
+                      type="password"
+                      required
+                      minLength={8}
+                      className="flex-1 h-11 rounded-full bg-white/80 border border-[#FCE8EC] px-5 text-sm outline-none focus:border-[#FF8FA3] focus:bg-white placeholder:text-[#B08A95] transition"
+                    />
+                    <button disabled={loading} className="h-11 px-7 rounded-full btn-primary font-semibold text-sm shrink-0 disabled:opacity-50">
+                      {loading ? "…" : t.landing.enter}
+                    </button>
+                  </div>
+                </div>
+                {error && <p className="text-xs text-[#FF4D6D] text-center font-medium">{error}</p>}
+                <p className="text-[11px] font-mono text-[#B08A95] text-center tracking-wide">{(t.landing as any).passwordHint || t.landing.noPassword}</p>
               </form>
-              <p className="text-[11px] font-mono text-[#B08A95] text-center tracking-wide">Không cần mật khẩu · Vào ngay để cảm nhận</p>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 gap-2 sm:gap-3">
               {[
-                ["01", "Mở thư", "Ảnh mờ, chạm để hé lộ", "✉️"],
-                ["02", "Chọn một dòng", "Chạm prompt để trả lời", "💬"],
-                ["03", "Gửi bưu thiếp", "6–140 ký tự chân thành", "💌"],
-              ].map(([n, t, d, icon]) => (
-                <div key={n} className="rounded-[20px] glass p-4 text-center group hover:shadow-[0_8px_24px_rgba(46,26,34,0.06)] transition">
-                  <div className="w-8 h-8 rounded-full gradient-primary-soft border border-[#FCE8EC] grid place-items-center mx-auto text-[14px]">{icon}</div>
-                  <div className="font-mono text-[10px] tracking-[0.14em] text-[#FF8FA3] mt-2.5 font-semibold">{n}</div>
-                  <div className="text-[13px] font-semibold mt-1 text-[#2E1A22]">{t}</div>
-                  <div className="text-[11.5px] text-[#8E6B75] leading-snug mt-1">{d}</div>
+                ["01", t.landing.step1Title, t.landing.step1Desc, "✉️"],
+                ["02", t.landing.step2Title, t.landing.step2Desc, "💬"],
+                ["03", t.landing.step3Title, t.landing.step3Desc, "💌"],
+              ].map(([n, title, desc, icon]) => (
+                <div key={n} className="rounded-[16px] glass p-3 sm:p-4 text-center group hover:shadow-[0_8px_24px_rgba(46,26,34,0.06)] transition">
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full gradient-primary-soft border border-[#FCE8EC] grid place-items-center mx-auto text-[12px] sm:text-[14px]">{icon}</div>
+                  <div className="font-mono text-[9px] sm:text-[10px] tracking-[0.14em] text-[#FF8FA3] mt-2 sm:mt-2.5 font-semibold">{n}</div>
+                  <div className="text-[12px] sm:text-[13px] font-semibold mt-1 text-[#2E1A22]">{title}</div>
+                  <div className="text-[10.5px] sm:text-[11.5px] text-[#8E6B75] leading-snug mt-1">{desc}</div>
                 </div>
               ))}
             </div>
           </div>
 
           <div className="flex gap-4 text-xs font-mono text-[#B08A95] justify-center lg:justify-start">
-            <Link href="/privacy" className="hover:text-[#2E1A22] transition">Privacy</Link>
+            <Link href="/privacy" className="hover:text-[#2E1A22] transition">{t.common.privacy}</Link>
             <span className="opacity-30">·</span>
-            <Link href="/terms" className="hover:text-[#2E1A22] transition">Terms</Link>
+            <Link href="/terms" className="hover:text-[#2E1A22] transition">{t.common.terms}</Link>
             <span className="opacity-30">·</span>
-            <Link href="/community-guidelines" className="hover:text-[#2E1A22] transition">Guidelines</Link>
+            <Link href="/community-guidelines" className="hover:text-[#2E1A22] transition">{t.common.guidelines}</Link>
           </div>
         </div>
 
@@ -157,7 +191,7 @@ export default function LandingClient() {
             >
               <div className="px-6 pt-6 pb-3 flex items-center justify-between">
                 <span className="text-[10px] font-mono tracking-[0.14em] uppercase text-[#FF4D6D] font-semibold flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#FF4D6D] animate-pulse-soft" /> Bưu thiếp #07 — Hôm nay
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#FF4D6D] animate-pulse-soft" /> {t.landing.previewBadge}
                 </span>
                 <span className="text-[11px] font-mono text-[#B08A95] bg-[#FFF0F3] border border-[#FCE8EC] px-2.5 py-1 rounded-full">20 · Q&A</span>
               </div>
@@ -197,8 +231,8 @@ export default function LandingClient() {
             >
               <div className="w-11 h-11 rounded-full gradient-primary grid place-items-center text-white text-sm shadow-[0_4px_12px_rgba(255,77,109,0.3)] shrink-0">♥</div>
               <div className="text-sm flex-1 min-w-0">
-                <div className="font-semibold text-[#2E1A22]">Đã kết nối — kèm lời nhắn</div>
-                <div className="text-xs text-[#8E6B75] truncate">“Mình cũng viết mỗi sáng, 7h ở Thảo Điền... ☕️”</div>
+                <div className="font-semibold text-[#2E1A22]">{t.landing.connected}</div>
+                <div className="text-xs text-[#8E6B75] truncate">{t.landing.previewMsg}</div>
               </div>
               <div className="w-8 h-8 rounded-full bg-emerald-500 text-white grid place-items-center text-xs shrink-0">✓</div>
             </motion.div>

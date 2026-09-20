@@ -11,9 +11,9 @@ export default async function MatchesPage() {
   const user = await prisma.user.findUnique({ where: { id: userId }, include: { profile: true } });
   if (!user?.profile) redirect("/onboarding");
   return (
-    <div className="min-h-screen flex">
+    <div className="h-[100dvh] overflow-hidden flex">
       <Nav />
-      <main className="flex-1">
+      <main className="flex-1 min-w-0 flex flex-col h-[100dvh] overflow-hidden">
         <MatchesClient />
       </main>
     </div>

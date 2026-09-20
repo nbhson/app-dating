@@ -2,6 +2,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
+import { useI18n } from "@/lib/i18n/context";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 type Prompt = { id: string; question: string; answer: string };
 type Profile = {
@@ -23,15 +25,9 @@ type Profile = {
   dailyAnswer?: { question: string; answer: string } | null;
 };
 
-const intentLabel: Record<string, string> = {
-  LONG_TERM: "Tìm lâu dài",
-  SHORT_TERM: "Tìm hiểu nhẹ",
-  FRIENDSHIP: "Bạn trước",
-  EXPLORING: "Đang khám phá",
-  UNSURE: "Chưa chắc",
-};
-
 export default function DiscoverClient() {
+  const { t, trans, locale } = useI18n();
+  const intentLabel = t.intent as Record<string, string>;
   const [profile, setProfile] = useState<Profile | null>(null);
   const [usage, setUsage] = useState<{ viewed: number; limit: number; remaining: number } | null>(null);
   const [dailyQ, setDailyQ] = useState<string | null>(null);
@@ -44,6 +40,7 @@ export default function DiscoverClient() {
   const [comment, setComment] = useState("");
   const [showComment, setShowComment] = useState(false);
   const [reveal, setReveal] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
 
   async function fetchNext() {
     setLoading(true);
@@ -137,12 +134,12 @@ export default function DiscoverClient() {
           <div className="absolute inset-0 bg-gradient-to-br from-[#FFF0F3]/60 to-transparent pointer-events-none" />
           <div className="w-16 h-16 rounded-full gradient-primary text-white grid place-items-center mx-auto text-2xl shadow-[0_8px_20px_rgba(255,77,109,0.35)] relative">♥</div>
           <div className="relative">
-            <h2 className="font-display text-[28px] leading-none font-medium">Đã kết nối ✨</h2>
-            <p className="text-sm text-[#8E6B75] mt-2.5 leading-relaxed">Bạn và <span className="font-semibold text-[#2E1A22]">{profile?.name}</span> đã chọn nhau. Lời nhắn của bạn đã được gửi — nhẹ nhàng và chân thành.</p>
+            <h2 className="font-display text-[28px] leading-none font-medium">{t.discover.matchedTitle}</h2>
+            <p className="text-sm text-[#8E6B75] mt-2.5 leading-relaxed">{trans("discover.matchedDesc", { name: profile?.name ?? "" }).split(profile?.name ?? "")[0]}<span className="font-semibold text-[#2E1A22]">{profile?.name}</span>{trans("discover.matchedDesc", { name: profile?.name ?? "" }).split(profile?.name ?? "")[1] ?? ""}</p>
           </div>
           <div className="flex gap-3 pt-1 relative">
             <Link href={`/matches/${match.matchId}`} className="flex-1 h-11 rounded-full bg-[#2E1A22] text-white grid place-items-center text-sm font-semibold shadow-[0_8px_20px_rgba(46,26,34,0.18)] hover:bg-[#1F1218] transition">
-              Mở thư →
+              {t.discover.openMail}
             </Link>
             <button
               onClick={() => {
@@ -151,7 +148,7 @@ export default function DiscoverClient() {
               }}
               className="flex-1 h-11 rounded-full glass border border-[#F3DDE2] text-sm font-semibold hover:bg-white transition"
             >
-              Tiếp tục
+              {t.discover.continue}
             </button>
           </div>
         </motion.div>
@@ -160,16 +157,16 @@ export default function DiscoverClient() {
   }
 
   return (
-    <div className="flex-1 flex flex-col min-h-0">
-      {/* Header - floating glass giống menu */}
-      <div className="sticky top-4 z-20 px-4 md:px-6 pointer-events-none">
+    <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+      {/* Header - floating glass - shrink-0 to stay inside viewport */}
+      <div className="shrink-0 z-20 px-3 md:px-6 pt-3 md:pt-4 pointer-events-none">
         <div className="max-w-[1020px] mx-auto w-full glass-strong rounded-[24px] md:rounded-[28px] px-4 md:px-5 py-3 flex items-center justify-between border border-white/70 shadow-[0_8px_24px_rgba(46,26,34,0.08),0_2px_8px_rgba(46,26,34,0.04)] pointer-events-auto relative overflow-hidden">
           <div className="absolute -right-8 -top-8 w-24 h-24 rounded-full bg-[#FF8FA3]/10 blur-2xl pointer-events-none" />
           <div className="flex items-center gap-3 relative">
             <span className="w-9 h-9 rounded-full gradient-primary text-white grid place-items-center text-[13px] font-bold shadow-[0_4px_12px_rgba(255,77,109,0.3)]">♥</span>
             <div>
-              <div className="font-display text-[15px] font-semibold tracking-tight leading-none flex items-center gap-2">Khám phá <span className="hidden sm:inline text-[10px] font-mono tracking-[0.14em] uppercase text-[#FF4D6D] bg-[#FFF0F3] border border-[#FCE8EC] px-2 py-0.5 rounded-full">Bưu thiếp</span></div>
-              <div className="hidden md:block text-[11px] text-[#8E6B75] font-medium leading-none mt-0.5">20 bưu thiếp / ngày · chậm mà sâu</div>
+              <div className="font-display text-[15px] font-semibold tracking-tight leading-none flex items-center gap-2">{t.discover.title} <span className="hidden sm:inline text-[10px] font-mono tracking-[0.14em] uppercase text-[#FF4D6D] bg-[#FFF0F3] border border-[#FCE8EC] px-2 py-0.5 rounded-full">{t.nav.discoverSub}</span></div>
+              <div className="hidden md:block text-[11px] text-[#8E6B75] font-medium leading-none mt-0.5">{t.discover.subtitle}</div>
             </div>
           </div>
           <div className="flex items-center gap-2 md:gap-3 relative">
@@ -181,9 +178,10 @@ export default function DiscoverClient() {
                 <div className="hidden sm:block h-1.5 w-16 md:w-20 bg-[#FFF0F3] rounded-full overflow-hidden">
                   <div className="h-full gradient-primary rounded-full transition-all duration-500" style={{ width: `${(usage.viewed / usage.limit) * 100}%` }} />
                 </div>
-                <span className="hidden lg:inline text-[10px] font-mono text-[#B08A95]">còn {usage.remaining}</span>
+                <span className="hidden lg:inline text-[10px] font-mono text-[#B08A95]">{trans("discover.remaining", { count: usage.remaining })}</span>
               </div>
             )}
+            <LanguageSwitcher variant="compact" className="hidden sm:inline-flex" />
             <Link href="/matches" className="relative w-10 h-10 rounded-full bg-white border border-[#FCE8EC] grid place-items-center hover:bg-[#FFF0F3] hover:border-[#FFD6DE] transition shadow-sm group">
               <span className="text-[15px] group-hover:scale-110 transition">✉</span>
               {unreadTotal > 0 && (
@@ -197,46 +195,46 @@ export default function DiscoverClient() {
       </div>
 
       {dailyQ && !loading && profile && (
-        <div className="max-w-[1020px] mx-auto w-full px-4 md:px-6 pt-5">
-          <div className="rounded-[20px] bg-[#2E1A22] text-white px-5 py-4 flex gap-4 items-start relative overflow-hidden shadow-[0_8px_24px_rgba(46,26,34,0.18)]">
+        <div className="shrink-0 max-w-[1020px] mx-auto w-full px-3 md:px-6 pt-3">
+          <div className="rounded-[20px] bg-[#2E1A22] text-white px-4 md:px-5 py-3 flex gap-3 items-start relative overflow-hidden shadow-[0_8px_24px_rgba(46,26,34,0.18)]">
             <div className="absolute -right-10 -top-10 w-32 h-32 rounded-full bg-[#FF4D6D]/20 blur-2xl" />
-            <span className="text-[11px] font-mono tracking-[0.16em] uppercase text-[#FF8FA3] font-semibold mt-0.5 shrink-0 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-[#FF4D6D] animate-pulse" /> Câu hỏi hôm nay</span>
-            <p className="font-display text-[15px] leading-snug flex-1 italic">“{dailyQ}”</p>
+            <span className="text-[11px] font-mono tracking-[0.16em] uppercase text-[#FF8FA3] font-semibold mt-0.5 shrink-0 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-[#FF4D6D] animate-pulse" /> {t.discover.dailyQuestion}</span>
+            <p className="font-display text-[14px] md:text-[15px] leading-snug flex-1 italic line-clamp-2">“{dailyQ}”</p>
           </div>
         </div>
       )}
 
-      <div className="flex-1 flex flex-col items-center p-4 md:p-6 pb-28 md:pb-6">
+      <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar md:overflow-hidden flex flex-col items-center p-3 md:p-4 pb-[84px] md:pb-4 gap-3 overscroll-contain">
         {loading ? (
-          <div className="w-full max-w-[1020px] grid md:grid-cols-[1.05fr_1fr] gap-6">
-            <div className="h-[560px] rounded-[32px] glass animate-pulse border-white/60" />
-            <div className="h-[560px] rounded-[32px] glass animate-pulse hidden md:block border-white/60" />
+          <div className="w-full max-w-[1020px] flex-1 min-h-0 grid md:grid-cols-[1.05fr_1fr] gap-4 md:gap-6 overflow-hidden">
+            <div className="h-full min-h-[320px] rounded-[32px] glass animate-pulse border-white/60" />
+            <div className="h-full min-h-[320px] rounded-[32px] glass animate-pulse hidden md:block border-white/60" />
           </div>
         ) : error === "DAILY_LIMIT_REACHED" ? (
-          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-[560px] mt-6 relative">
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-[560px] flex-1 min-h-0 flex flex-col justify-center relative overflow-hidden">
             <div className="aura aura-lavender w-72 h-72 -top-10 -right-10 opacity-30 pointer-events-none" />
             <div className="glass-strong rounded-[32px] p-8 md:p-10 text-center space-y-6 relative overflow-hidden">
               <div className="absolute -right-10 -top-10 w-32 h-32 rounded-full bg-[#FF8FA3]/10 blur-2xl" />
               <div className="w-16 h-16 rounded-full bg-[#2E1A22] text-white grid place-items-center mx-auto text-xl shadow-[0_8px_20px_rgba(46,26,34,0.18)]">🌙</div>
               <div>
-                <div className="font-display text-[26px] font-medium leading-none">Hôm nay đã đủ 20 bưu thiếp</div>
-                <p className="text-sm text-[#8E6B75] leading-relaxed mt-3 max-w-[42ch] mx-auto">Lumen cố ý chậm — để mỗi bưu thiếp có trọng lượng. Hãy dành buổi tối cho những kết nối đang có, mai 00:00 sẽ có 20 lá mới.</p>
+                <div className="font-display text-[26px] font-medium leading-none">{t.discover.dailyLimitTitle}</div>
+                <p className="text-sm text-[#8E6B75] leading-relaxed mt-3 max-w-[42ch] mx-auto">{t.discover.dailyLimitDesc}</p>
               </div>
               <div className="flex items-center justify-center gap-2 text-xs font-mono text-[#B08A95] bg-[#FFF0F3] border border-[#FCE8EC] rounded-full px-4 py-2 mx-auto w-fit">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> 20/20 đã xem · làm mới lúc 00:00
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> {t.discover.dailyLimitBadge}
               </div>
               <div className="grid grid-cols-2 gap-3 pt-1">
                 <Link href="/matches" className="h-11 rounded-full bg-[#2E1A22] text-white grid place-items-center text-sm font-semibold hover:bg-[#1F1218] transition relative">
-                  Xem hòm thư
+                  {t.discover.viewHomet}
                   {unreadTotal>0 && <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full gradient-primary text-white text-[10px] font-bold grid place-items-center border-2 border-white">{unreadTotal}</span>}
                 </Link>
-                <Link href="/profile" className="h-11 rounded-full glass border border-[#FCE8EC] grid place-items-center text-sm font-semibold hover:bg-white transition">Sửa hồ sơ</Link>
+                <Link href="/profile" className="h-11 rounded-full glass border border-[#FCE8EC] grid place-items-center text-sm font-semibold hover:bg-white transition">{t.discover.editProfile}</Link>
               </div>
-              <p className="text-[11px] font-mono text-[#B08A95]">Mẹo: trả lời “Câu hỏi hôm nay” trong Hồ sơ để bưu thiếp mai ấm hơn ✨</p>
+              <p className="text-[11px] font-mono text-[#B08A95]">{t.discover.dailyLimitTip}</p>
             </div>
           </motion.div>
         ) : error === "NO_PROFILES" ? (
-          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-[640px] mt-4 relative">
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-[640px] flex-1 min-h-0 flex flex-col justify-center relative overflow-hidden md:overflow-hidden overflow-y-auto no-scrollbar">
             <div className="aura aura-peach w-80 h-80 -top-16 -left-16 opacity-30 pointer-events-none" />
             <div className="aura aura-lavender w-72 h-72 top-10 -right-12 opacity-25 pointer-events-none" />
             <div className="glass-strong rounded-[32px] p-7 md:p-10 relative overflow-hidden">
@@ -248,8 +246,8 @@ export default function DiscoverClient() {
                 <div className="absolute inset-0 bg-white rounded-[20px] border border-[#FCE8EC] shadow-[0_12px_32px_rgba(46,26,34,0.08)] grid place-items-center p-6">
                   <div className="text-center space-y-2">
                     <div className="w-12 h-12 rounded-full bg-[#FFF0F3] border border-[#FCE8EC] grid place-items-center mx-auto text-xl">💌</div>
-                    <div className="text-xs font-mono tracking-[0.14em] uppercase text-[#FF4D6D] font-semibold">Hết bưu thiếp</div>
-                    <div className="text-[11px] text-[#B08A95]">Đã xem hết gợi ý phù hợp</div>
+                    <div className="text-xs font-mono tracking-[0.14em] uppercase text-[#FF4D6D] font-semibold">{t.discover.emptyBadge}</div>
+                    <div className="text-[11px] text-[#B08A95]">{t.discover.emptyHint}</div>
                   </div>
                   <div className="absolute -top-2 -right-2 w-7 h-7 rounded-full gradient-primary text-white grid place-items-center text-xs shadow-md">♥</div>
                   <div className="absolute -bottom-2 -left-2 w-6 h-6 rounded-full bg-[#2E1A22] text-white grid place-items-center text-[10px]">✦</div>
@@ -257,45 +255,45 @@ export default function DiscoverClient() {
               </div>
 
               <div className="text-center space-y-3">
-                <h3 className="font-display text-[24px] md:text-[26px] font-medium leading-none">Tạm hết người mới rồi 🌱</h3>
+                <h3 className="font-display text-[24px] md:text-[26px] font-medium leading-none">{t.discover.noProfilesTitle}</h3>
                 <p className="text-sm text-[#8E6B75] leading-relaxed max-w-[48ch] mx-auto">
-                  Bạn đã xem hết những bưu thiếp phù hợp với bộ lọc hiện tại. Không phải lỗi — chỉ là Lumen đang giữ nhịp chậm. Thử nới lỏng một chút, mai sẽ có thêm người mới.
+                  {t.discover.noProfilesDesc}
                 </p>
                 {usage && (
                   <div className="inline-flex items-center gap-2 text-xs font-medium bg-white border border-[#FCE8EC] rounded-full px-3.5 py-1.5">
-                    <span className="w-2 h-2 rounded-full bg-[#FF4D6D] animate-pulse" /> Đã xem {usage.viewed}/{usage.limit} hôm nay · còn {usage.remaining} lượt mai
+                    <span className="w-2 h-2 rounded-full bg-[#FF4D6D] animate-pulse" /> {trans("discover.viewedBadge", { viewed: usage.viewed, limit: usage.limit, remaining: usage.remaining })}
                   </div>
                 )}
               </div>
 
               <div className="mt-6 rounded-[20px] bg-[#FFF0F3]/70 border border-[#FCE8EC] p-4">
-                <div className="text-xs font-semibold text-[#6E4A56] flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-[#FF8FA3]" /> Gợi ý để có thêm bưu thiếp</div>
+                <div className="text-xs font-semibold text-[#6E4A56] flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-[#FF8FA3]" /> {t.discover.suggestions}</div>
                 <div className="flex flex-wrap gap-2 mt-3">
-                  <Link href="/profile" className="px-3.5 py-2 rounded-full bg-white border border-[#FCE8EC] text-xs font-semibold hover:border-[#FF8FA3] hover:text-[#FF4D6D] transition">📍 +20 km bán kính</Link>
-                  <Link href="/profile" className="px-3.5 py-2 rounded-full bg-white border border-[#FCE8EC] text-xs font-semibold hover:border-[#FF8FA3] hover:text-[#FF4D6D] transition">🎂 Mở rộng ±5 tuổi</Link>
-                  <Link href="/profile" className="px-3.5 py-2 rounded-full bg-white border border-[#FCE8EC] text-xs font-semibold hover:border-[#FF8FA3] hover:text-[#FF4D6D] transition">💬 Thử “Đang khám phá”</Link>
-                  <button onClick={()=>fetchNext()} className="px-3.5 py-2 rounded-full bg-white border border-[#FCE8EC] text-xs font-semibold hover:bg-[#FFF0F3] transition">🔄 Làm mới</button>
+                  <Link href="/profile" className="px-3.5 py-2 rounded-full bg-white border border-[#FCE8EC] text-xs font-semibold hover:border-[#FF8FA3] hover:text-[#FF4D6D] transition">{t.discover.expandRadius}</Link>
+                  <Link href="/profile" className="px-3.5 py-2 rounded-full bg-white border border-[#FCE8EC] text-xs font-semibold hover:border-[#FF8FA3] hover:text-[#FF4D6D] transition">{t.discover.expandAge}</Link>
+                  <Link href="/profile" className="px-3.5 py-2 rounded-full bg-white border border-[#FCE8EC] text-xs font-semibold hover:border-[#FF8FA3] hover:text-[#FF4D6D] transition">{t.discover.tryExploring}</Link>
+                  <button onClick={()=>fetchNext()} className="px-3.5 py-2 rounded-full bg-white border border-[#FCE8EC] text-xs font-semibold hover:bg-[#FFF0F3] transition">{t.discover.refresh}</button>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mt-6">
                 <Link href="/profile" className="h-11 rounded-full btn-primary grid place-items-center text-sm font-semibold shadow-[0_6px_16px_rgba(255,77,109,0.25)]">
-                  Điều chỉnh bộ lọc →
+                  {t.discover.adjustFilter}
                 </Link>
                 <button onClick={()=>fetchNext()} className="h-11 rounded-full bg-white border border-[#FCE8EC] text-sm font-semibold hover:bg-[#FFF0F3] transition">
-                  Thử lại
+                  {t.discover.tryAgain}
                 </button>
                 <Link href="/matches" className="h-11 rounded-full bg-[#2E1A22] text-white grid place-items-center text-sm font-semibold hover:bg-[#1F1218] transition relative">
-                  Hòm thư
+                  {t.discover.inbox}
                   {unreadTotal>0 && <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-[#FF4D6D] text-white text-[10px] font-bold grid place-items-center border border-white">{unreadTotal}</span>}
                 </Link>
               </div>
 
-              <p className="text-center text-[11px] font-mono text-[#B08A95] mt-4">Bưu thiếp mới xuất hiện khi có người phù hợp đăng ký · Lumen làm mới mỗi ngày lúc 00:00 ✨</p>
+              <p className="text-center text-[11px] font-mono text-[#B08A95] mt-4">{t.discover.newPostcardsInfo}</p>
             </div>
           </motion.div>
         ) : profile ? (
-          <div className="w-full max-w-[1020px] flex flex-col gap-4">
+          <div className="w-full max-w-[1020px] flex-1 min-h-0 flex flex-col gap-3 overflow-hidden">
             <AnimatePresence mode="wait">
               <motion.div
                 key={profile.id}
@@ -303,11 +301,11 @@ export default function DiscoverClient() {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -12, scale: 0.98 }}
                 transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-                className="grid md:grid-cols-[1.05fr_1fr] gap-6"
+                className="flex-1 min-h-0 grid md:grid-cols-[1.05fr_1fr] gap-4 md:gap-6 md:overflow-hidden overflow-visible"
               >
-                {/* Left: Photo Letter */}
-                <div className="glass-strong rounded-[32px] overflow-hidden flex flex-col shadow-[0_12px_40px_rgba(46,26,34,0.08)]">
-                  <div className="relative h-[500px] md:h-[580px] bg-[#FFE8EC] overflow-hidden group">
+                {/* Left: Photo Letter - responsive height, no overflow */}
+                <div className="glass-strong rounded-[32px] overflow-hidden flex flex-col shadow-[0_12px_40px_rgba(46,26,34,0.08)] min-h-0">
+                  <div className="relative flex-1 min-h-[280px] h-[42dvh] md:h-full md:min-h-0 bg-[#FFE8EC] overflow-hidden group">
                     <img
                       src={profile.photos[photoIdx]?.url ?? profile.photos[0]?.url}
                       alt=""
@@ -320,7 +318,7 @@ export default function DiscoverClient() {
                       >
                         <span className="glass-strong rounded-full px-6 py-3 text-sm font-semibold shadow-[0_8px_24px_rgba(46,26,34,0.18)] flex items-center gap-2 text-[#2E1A22]">
                           <span className="w-7 h-7 rounded-full gradient-primary grid place-items-center text-white text-xs">♥</span>
-                          Mở bưu thiếp · {profile.name}
+                          {trans("discover.openCard", { name: profile.name })}
                         </span>
                       </button>
                     )}
@@ -343,30 +341,47 @@ export default function DiscoverClient() {
                   <div className="p-4 flex items-center justify-between bg-white/60 backdrop-blur border-t border-white/60">
                     <div className="flex gap-1.5">
                       {profile.voiceUrl ? (
-                        <span className="px-3 py-1.5 rounded-full bg-white border border-[#FCE8EC] text-xs font-medium flex items-center gap-1.5 shadow-sm"><span className="w-6 h-6 rounded-full gradient-primary grid place-items-center text-white text-[10px]">▶</span> {profile.voiceDuration ?? 15}s voice</span>
+                        <span className="px-3 py-1.5 rounded-full bg-white border border-[#FCE8EC] text-xs font-medium flex items-center gap-1.5 shadow-sm"><span className="w-6 h-6 rounded-full gradient-primary grid place-items-center text-white text-[10px]">▶</span> {trans("discover.voiceAvailable", { duration: profile.voiceDuration ?? 15 })}</span>
                       ) : (
-                        <span className="px-3 py-1.5 rounded-full bg-white/70 border border-[#FCE8EC] text-xs text-[#8E6B75]">Chưa có voice</span>
+                        <span className="px-3 py-1.5 rounded-full bg-white/70 border border-[#FCE8EC] text-xs text-[#8E6B75]">{t.discover.noVoice}</span>
                       )}
                     </div>
-                    <button
-                      onClick={async () => {
-                        const r = prompt("Lý do báo cáo: Fake, Quấy rối, Spam, Nội dung không phù hợp, Lừa đảo, Khác");
-                        if (!r) return;
-                        await fetch(`/api/users/${profile.id}/report`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason: r, details: "" }) });
-                        alert("Đã gửi báo cáo.");
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setReportOpen(true)}
+                        className="text-xs font-medium border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-full px-3.5 py-1.5 transition"
+                      >
+                        {t.discover.report}
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (!confirm(`Chặn ${profile.name}?`)) return;
+                          await fetch(`/api/users/${profile.id}/block`, { method: "POST" });
+                          fetchNext();
+                        }}
+                        className="text-xs font-medium text-[#8E6B75] hover:text-[#2E1A22] border border-[#FCE8EC] rounded-full px-3.5 py-1.5 bg-white/70 hover:bg-white transition"
+                      >
+                        {t.chat.block}
+                      </button>
+                    </div>
+                  </div>
+                  {reportOpen && profile && (
+                    <ReportModal
+                      onClose={() => setReportOpen(false)}
+                      onSubmit={async (reason, details) => {
+                        await fetch(`/api/users/${profile.id}/report`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason, details }) });
+                        alert(t.discover.reportSent);
+                        setReportOpen(false);
                         fetchNext();
                       }}
-                      className="text-xs font-medium text-[#8E6B75] hover:text-[#2E1A22] border border-[#FCE8EC] rounded-full px-3.5 py-1.5 bg-white/70 hover:bg-white transition"
-                    >
-                      Báo cáo
-                    </button>
-                  </div>
+                    />
+                  )}
                 </div>
 
-                {/* Right: Letter Content */}
-                <div className="glass-strong rounded-[32px] p-6 md:p-7 flex flex-col gap-6 md:overflow-auto md:max-h-[640px] no-scrollbar">
+                {/* Right: Letter Content - mobile visible (outer scroll), desktop inner scroll hidden */}
+                <div className="glass-strong rounded-[32px] p-4 md:p-6 flex flex-col gap-4 md:gap-5 md:min-h-0 overflow-visible md:overflow-y-auto no-scrollbar md:overscroll-contain">
                   <div className="space-y-3">
-                    <div className="inline-flex items-center gap-2 text-[10px] font-mono tracking-[0.14em] uppercase text-[#FF4D6D] font-semibold bg-[#FFF0F3] border border-[#FCE8EC] px-3 py-1.5 rounded-full">Bưu thiếp #{usage ? String(usage.viewed).padStart(2, "0") : "—"} · {new Date().toLocaleDateString("vi-VN")} <span className="w-1 h-1 rounded-full bg-[#FF4D6D]" /> Lumen</div>
+                    <div className="inline-flex items-center gap-2 text-[10px] font-mono tracking-[0.14em] uppercase text-[#FF4D6D] font-semibold bg-[#FFF0F3] border border-[#FCE8EC] px-3 py-1.5 rounded-full">{trans("discover.postcardMeta", { num: usage ? String(usage.viewed).padStart(2, "0") : "—", date: new Date().toLocaleDateString(locale === "vi" ? "vi-VN" : "en-US") })} <span className="w-1 h-1 rounded-full bg-[#FF4D6D]" /> Lumen</div>
                     {profile.bio && (
                       <p className="font-display text-[19px] leading-[1.55] text-[#2E1A22]">“{profile.bio}”</p>
                     )}
@@ -379,7 +394,7 @@ export default function DiscoverClient() {
                   {profile.dailyAnswer && (
                     <div className="rounded-[20px] bg-[#2E1A22] text-white p-5 space-y-2 relative overflow-hidden shadow-[0_8px_24px_rgba(46,26,34,0.14)]">
                       <div className="absolute -right-8 -top-8 w-24 h-24 rounded-full bg-[#FF4D6D]/15 blur-2xl" />
-                      <div className="text-[10px] font-mono tracking-[0.16em] uppercase text-[#FF8FA3] font-semibold">Hôm nay họ trả lời</div>
+                      <div className="text-[10px] font-mono tracking-[0.16em] uppercase text-[#FF8FA3] font-semibold">{t.discover.todayAnswer}</div>
                       <div className="text-xs opacity-70 italic">“{profile.dailyAnswer.question}”</div>
                       <div className="font-display text-[15.5px] leading-snug">“{profile.dailyAnswer.answer}”</div>
                     </div>
@@ -389,29 +404,29 @@ export default function DiscoverClient() {
                     <div className="rounded-[20px] bg-gradient-to-br from-[#FFF0F3] to-white border border-[#FCE8EC] p-4 flex items-center gap-3.5 shadow-sm">
                       <div className="w-11 h-11 rounded-full gradient-primary text-white grid place-items-center text-xs font-bold shadow-[0_4px_12px_rgba(255,77,109,0.3)] shrink-0">{profile.compatibility.score}%</div>
                       <div className="text-xs leading-snug">
-                        <div className="font-semibold text-[#2E1A22]">Chung {profile.compatibility.shared.join(" · ")}</div>
-                        <div className="text-[#8E6B75]">Gợi ý để bắt đầu cuộc trò chuyện 💬</div>
+                        <div className="font-semibold text-[#2E1A22]">{trans("discover.compatibility", { shared: profile.compatibility.shared.join(" · ") })}</div>
+                        <div className="text-[#8E6B75]">{t.discover.compatibilityHint}</div>
                       </div>
                     </div>
                   )}
 
                   <div className="space-y-3">
-                    <div className="text-xs font-semibold tracking-wide text-[#8E6B75] flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-[#FF8FA3]" /> Sở thích — chạm để chọn làm gợi ý</div>
+                    <div className="text-xs font-semibold tracking-wide text-[#8E6B75] flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-[#FF8FA3]" /> {t.discover.interestsHint}</div>
                     <div className="flex flex-wrap gap-1.5">
-                      {profile.interests.map((t) => (
+                      {profile.interests.map((t2) => (
                         <button
-                          key={t}
-                          onClick={() => { setSelectedAnchor(t); setShowComment(true); }}
-                          className={`px-3.5 py-2 rounded-full text-xs font-semibold border transition-all ${selectedAnchor === t ? "bg-[#2E1A22] text-white border-[#2E1A22] shadow-[0_4px_12px_rgba(46,26,34,0.2)]" : "bg-white border-[#FCE8EC] hover:border-[#FF8FA3] hover:text-[#FF4D6D] hover:shadow-sm"}`}
+                          key={t2}
+                          onClick={() => { setSelectedAnchor(t2); setShowComment(true); }}
+                          className={`px-3.5 py-2 rounded-full text-xs font-semibold border transition-all ${selectedAnchor === t2 ? "bg-[#2E1A22] text-white border-[#2E1A22] shadow-[0_4px_12px_rgba(46,26,34,0.2)]" : "bg-white border-[#FCE8EC] hover:border-[#FF8FA3] hover:text-[#FF4D6D] hover:shadow-sm"}`}
                         >
-                          {t}
+                          {t2}
                         </button>
                       ))}
                     </div>
                   </div>
 
                   <div className="space-y-3">
-                    <div className="text-xs font-semibold tracking-wide text-[#8E6B75] flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-[#FF8FA3]" /> Lời tự sự</div>
+                    <div className="text-xs font-semibold tracking-wide text-[#8E6B75] flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-[#FF8FA3]" /> {t.discover.promptsHint}</div>
                     <div className="space-y-3">
                       {profile.prompts.length > 0 ? profile.prompts.map((pr) => (
                         <button
@@ -423,7 +438,7 @@ export default function DiscoverClient() {
                           <div className={`font-display text-[15px] leading-snug mt-1.5 ${selectedAnchor === pr.question ? "text-white" : "text-[#2E1A22]"}`}>{pr.answer}</div>
                         </button>
                       )) : (
-                        <div className="rounded-[20px] border border-dashed border-[#FCE8EC] p-5 text-sm text-[#8E6B75] text-center bg-white/50">Chưa có lời tự sự — hồ sơ này hơi lặng.</div>
+                        <div className="rounded-[20px] border border-dashed border-[#FCE8EC] p-5 text-sm text-[#8E6B75] text-center bg-white/50">{t.discover.noPrompts}</div>
                       )}
                     </div>
                   </div>
@@ -433,14 +448,14 @@ export default function DiscoverClient() {
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-xs font-semibold tracking-wide text-[#6E4A56] flex items-center gap-2">
                         <span className="w-7 h-7 rounded-full bg-[#FFF0F3] border border-[#FCE8EC] grid place-items-center text-[#FF4D6D] text-xs">♥</span>
-                        <span className="truncate">{selectedAnchor ? `Về “${selectedAnchor.slice(0, 24)}”` : "Gửi một dòng thật lòng"}</span>
+                        <span className="truncate">{selectedAnchor ? trans("discover.about", { anchor: selectedAnchor.slice(0, 24) }) : t.discover.sendThoughtful}</span>
                       </span>
-                      {selectedAnchor && <button onClick={() => setSelectedAnchor(null)} className="text-xs font-medium underline text-[#8E6B75] shrink-0">Bỏ chọn</button>}
+                      {selectedAnchor && <button onClick={() => setSelectedAnchor(null)} className="text-xs font-medium underline text-[#8E6B75] shrink-0">{t.discover.removeChoice}</button>}
                     </div>
                     <textarea
                       value={comment}
                       onChange={(e) => setComment(e.target.value)}
-                      placeholder={selectedAnchor ? `Mình cũng thích ${selectedAnchor}...` : "Mình ấn tượng vì... (tối thiểu 6 ký tự)"}
+                      placeholder={selectedAnchor ? trans("discover.placeholderWithAnchor", { anchor: selectedAnchor }) : t.discover.placeholderDefault}
                       rows={3}
                       className="w-full rounded-2xl border border-[#FCE8EC] bg-[#FFFCFA] p-3.5 text-sm outline-none focus:border-[#FF8FA3] focus:bg-white placeholder:text-[#B08A95] resize-none transition"
                       onFocus={() => setShowComment(true)}
@@ -453,23 +468,23 @@ export default function DiscoverClient() {
                           disabled={actionLoading}
                           className="h-10 px-5 rounded-full bg-white border border-[#FCE8EC] text-xs font-semibold hover:bg-[#FFF0F3] disabled:opacity-50 transition"
                         >
-                          Để sau
+                          {t.discover.pass}
                         </button>
                         <button
                           onClick={() => act("like")}
                           disabled={actionLoading || comment.trim().length < 6}
                           className="h-10 px-6 rounded-full btn-primary text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
                         >
-                          {actionLoading ? "..." : "Gửi bưu thiếp →"}
+                          {actionLoading ? "..." : t.discover.sendCard}
                         </button>
                       </div>
                     </div>
-                    <p className="text-[11px] text-[#B08A95] leading-relaxed bg-[#FFF0F3]/70 rounded-xl px-3 py-2 border border-[#FCE8EC]/50">Lumen không có nút “thả tim” trống. Mỗi lượt thích phải kèm một câu — để người kia biết vì sao bạn chọn họ.</p>
+                    <p className="text-[11px] text-[#B08A95] leading-relaxed bg-[#FFF0F3]/70 rounded-xl px-3 py-2 border border-[#FCE8EC]/50">{t.discover.needMessageHint}</p>
                   </div>
                 </div>
               </motion.div>
             </AnimatePresence>
-            <p className="text-center text-[11px] font-mono text-[#B08A95]">Mẹo: Chạm vào một sở thích hoặc câu tự sự để lấy làm chủ đề. Không vuốt — hãy đọc. ✨</p>
+            <p className="text-center text-[11px] font-mono text-[#B08A95]">{t.discover.tip}</p>
           </div>
         ) : (
           /* Fallback trống - tránh màn hình trắng như ảnh */
@@ -483,24 +498,56 @@ export default function DiscoverClient() {
                 <div className="absolute inset-0 bg-white rounded-[20px] border border-[#FCE8EC] shadow-[0_12px_32px_rgba(46,26,34,0.08)] grid place-items-center p-5">
                   <div className="text-center space-y-2">
                     <div className="w-12 h-12 rounded-full bg-[#FFF0F3] border border-[#FCE8EC] grid place-items-center mx-auto text-xl">💌</div>
-                    <div className="text-xs font-mono tracking-[0.14em] uppercase text-[#FF4D6D] font-semibold">Hết bưu thiếp</div>
-                    <div className="text-[11px] text-[#B08A95]">Không còn gợi ý lúc này</div>
+                    <div className="text-xs font-mono tracking-[0.14em] uppercase text-[#FF4D6D] font-semibold">{t.discover.emptyBadge}</div>
+                    <div className="text-[11px] text-[#B08A95]">{t.discover.notNowHint}</div>
                   </div>
                 </div>
               </div>
               <div>
-                <h3 className="font-display text-[22px] font-medium">Chưa có bưu thiếp phù hợp</h3>
-                <p className="text-sm text-[#8E6B75] leading-relaxed mt-2 max-w-[46ch] mx-auto">Có thể bạn đã xem hết hoặc bộ lọc đang hơi hẹp. Hãy thử nới lỏng hoặc quay lại sau — Lumen sẽ gửi thêm khi có người mới.</p>
+                <h3 className="font-display text-[22px] font-medium">{t.discover.emptyFallbackTitle}</h3>
+                <p className="text-sm text-[#8E6B75] leading-relaxed mt-2 max-w-[46ch] mx-auto">{t.discover.emptyFallbackDesc}</p>
               </div>
               <div className="flex flex-wrap justify-center gap-2">
-                <button onClick={()=>fetchNext()} className="px-4 py-2 rounded-full btn-primary text-xs font-semibold">Thử làm mới →</button>
-                <Link href="/profile" className="px-4 py-2 rounded-full bg-white border border-[#FCE8EC] text-xs font-semibold">Điều chỉnh bộ lọc</Link>
-                <Link href="/matches" className="px-4 py-2 rounded-full bg-[#2E1A22] text-white text-xs font-semibold relative">Hòm thư {unreadTotal>0 && <span className="ml-1 bg-[#FF4D6D] text-white px-1.5 py-0.5 rounded-full text-[10px]">{unreadTotal}</span>}</Link>
+                <button onClick={()=>fetchNext()} className="px-4 py-2 rounded-full btn-primary text-xs font-semibold">{t.discover.refresh}</button>
+                <Link href="/profile" className="px-4 py-2 rounded-full bg-white border border-[#FCE8EC] text-xs font-semibold">{t.discover.adjustFilter}</Link>
+                <Link href="/matches" className="px-4 py-2 rounded-full bg-[#2E1A22] text-white text-xs font-semibold relative">{t.discover.inbox} {unreadTotal>0 && <span className="ml-1 bg-[#FF4D6D] text-white px-1.5 py-0.5 rounded-full text-[10px]">{unreadTotal}</span>}</Link>
               </div>
-              <p className="text-[11px] font-mono text-[#B08A95]">Mẹo: cập nhật hồ sơ thật ấm để được ưu tiên hiển thị ✨</p>
+              <p className="text-[11px] font-mono text-[#B08A95]">{t.discover.warmProfileHint}</p>
             </div>
           </motion.div>
         )}
+      </div>
+    </div>
+  );
+}
+
+const REPORT_REASONS = ["Fake profile", "Harassment", "Spam", "Inappropriate content", "Scam", "Other"];
+
+function ReportModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (reason: string, details: string) => void }) {
+  const [reason, setReason] = useState(REPORT_REASONS[2]);
+  const [details, setDetails] = useState("");
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-[#1A1A1E]/40 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className="w-full max-w-md rounded-[24px] bg-white p-6 space-y-4 shadow-[0_16px_40px_rgba(0,0,0,0.18)]" onClick={(e) => e.stopPropagation()}>
+        <h3 className="font-semibold text-base">Báo cáo người dùng</h3>
+        <label className="block text-xs font-medium text-[#6E4A56] space-y-1">
+          <span>Lý do</span>
+          <select value={reason} onChange={(e) => setReason(e.target.value)} className="w-full h-11 rounded-xl border border-[#FCE8EC] bg-white px-3 text-sm outline-none focus:border-[#FF8FA3]">
+            {REPORT_REASONS.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block text-xs font-medium text-[#6E4A56] space-y-1">
+          <span>Chi tiết (không bắt buộc)</span>
+          <textarea value={details} onChange={(e) => setDetails(e.target.value)} rows={3} placeholder="Mô tả thêm..." className="w-full rounded-xl border border-[#FCE8EC] bg-[#FFFCFA] p-3 text-sm outline-none focus:border-[#FF8FA3] focus:bg-white resize-none" />
+        </label>
+        <div className="flex gap-2 justify-end">
+          <button onClick={onClose} className="h-10 px-5 rounded-full border border-[#FCE8EC] bg-white text-sm font-medium hover:bg-[#FFF0F3]">Hủy</button>
+          <button onClick={() => onSubmit(reason, details)} className="h-10 px-6 rounded-full bg-[#2E1A22] text-white text-sm font-semibold hover:bg-black">Gửi báo cáo</button>
+        </div>
       </div>
     </div>
   );

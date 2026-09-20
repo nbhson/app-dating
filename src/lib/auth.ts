@@ -4,6 +4,7 @@ import Apple from "next-auth/providers/apple";
 import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "./prisma";
+import bcrypt from "bcryptjs";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma) as any,
@@ -28,24 +29,44 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         ]
       : []),
     Credentials({
-      name: "Demo Login",
+      name: "Email + Password",
       credentials: {
         email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
       },
       async authorize(creds) {
         const email = (creds?.email as string)?.toLowerCase().trim();
-        if (!email) return null;
-        // find or create demo user
+        const password = creds?.password as string | undefined;
+        if (!email || !password) return null;
+        if (password.length < 8) return null;
+        // find user or create with passwordHash (register on first login)
         let user = await prisma.user.findUnique({ where: { email } });
         if (!user) {
+          const passwordHash = await bcrypt.hash(password, 10);
           user = await prisma.user.create({
             data: {
               email,
               name: email.split("@")[0],
+              passwordHash,
               status: "ACTIVE",
               lastActiveAt: new Date(),
             },
           });
+        } else {
+          if (user.status === "SUSPENDED" || user.status === "DELETED") return null;
+          // legacy/demo users without password -> set password on first use
+          if (!user.passwordHash) {
+            const passwordHash = await bcrypt.hash(password, 10);
+            user = await prisma.user.update({
+              where: { id: user.id },
+              data: { passwordHash, lastActiveAt: new Date() },
+            });
+          } else {
+            const ok = await bcrypt.compare(password, user.passwordHash);
+            if (!ok) return null;
+            // touch lastActiveAt
+            await prisma.user.update({ where: { id: user.id }, data: { lastActiveAt: new Date() } });
+          }
         }
         if (user.status === "SUSPENDED" || user.status === "DELETED") return null;
         return { id: user.id, email: user.email, name: user.name, image: user.avatarUrl };
