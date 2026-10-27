@@ -369,7 +369,7 @@ export const dictionaries = {
       loading: "Đang tải bảng điều khiển...",
       accessRequired: "Cần quyền Admin",
       accessDesc: "Tài khoản của bạn không có quyền admin. Chạy seed hoặc đặt isAdmin=true trong database.",
-      accessCodeHint: "UPDATE User SET isAdmin=1 WHERE email='nbhson43@gmail.com';",
+      accessCodeHint: "UPDATE User SET isAdmin=1 WHERE email='your-email@example.com'; -- set ADMIN_EMAIL env var instead",
       backToApp: "Quay lại ứng dụng",
       tabs: {
         overview: "Tổng quan",
@@ -950,7 +950,7 @@ export const dictionaries = {
       loading: "Loading admin dashboard...",
       accessRequired: "Admin access required",
       accessDesc: "Your account is not an admin. Run the seed script or manually set isAdmin=true in database.",
-      accessCodeHint: "UPDATE User SET isAdmin=1 WHERE email='nbhson43@gmail.com';",
+      accessCodeHint: "UPDATE User SET isAdmin=1 WHERE email='your-email@example.com'; -- set ADMIN_EMAIL env var instead",
       backToApp: "Back to app",
       tabs: {
         overview: "Overview",
