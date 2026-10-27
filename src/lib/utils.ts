@@ -15,7 +15,3 @@ export function todayKey(date = new Date()) {
   return date.toISOString().slice(0, 10); // YYYY-MM-DD UTC
 }
 
-export function formatDistance() {
-  // placeholder - for MVP return random proximity
-  return `${Math.floor(Math.random() * 20) + 1} km away`;
-}

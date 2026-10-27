@@ -5,14 +5,12 @@ export const DAILY_LIMIT = 20;
 
 export async function getTodayUsage(userId: string) {
   const date = todayKey();
-  let usage = await prisma.dailyUsage.findUnique({
+  // Use upsert to avoid race condition: check-then-create fails under concurrency
+  const usage = await prisma.dailyUsage.upsert({
     where: { userId_date: { userId, date } },
+    update: {},
+    create: { userId, date, profilesViewed: 0, likes: 0, passes: 0 },
   });
-  if (!usage) {
-    usage = await prisma.dailyUsage.create({
-      data: { userId, date, profilesViewed: 0, likes: 0, passes: 0 },
-    });
-  }
   return usage;
 }
 
