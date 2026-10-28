@@ -59,8 +59,26 @@ export async function POST(req: Request) {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user?.isAdmin) return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
   const { targetUserId, action } = await req.json();
-  if (action === "SUSPEND") await prisma.user.update({ where: { id: targetUserId }, data: { status: "SUSPENDED" } });
-  if (action === "ACTIVATE") await prisma.user.update({ where: { id: targetUserId }, data: { status: "ACTIVE" } });
-  if (action === "DELETE") await prisma.user.update({ where: { id: targetUserId }, data: { status: "DELETED" } });
+  // Validate: action whitelist + target tồn tại + không cho admin tác động
+  // lên admin khác (kể cả chính mình) — trước đây id rác → Prisma 500 và
+  // admin có thể khóa chính mình, không có audit entry nào.
+  const VALID_ACTIONS = new Set(["SUSPEND", "ACTIVATE", "DELETE"]);
+  if (!VALID_ACTIONS.has(action)) return NextResponse.json({ error: "INVALID_ACTION" }, { status: 400 });
+  if (!targetUserId || typeof targetUserId !== "string") {
+    return NextResponse.json({ error: "INVALID_TARGET" }, { status: 400 });
+  }
+  if (targetUserId === userId) {
+    return NextResponse.json({ error: "CANNOT_TARGET_SELF" }, { status: 400 });
+  }
+  const target = await prisma.user.findUnique({ where: { id: targetUserId }, select: { id: true, isAdmin: true } });
+  if (!target) return NextResponse.json({ error: "TARGET_NOT_FOUND" }, { status: 404 });
+  if (target.isAdmin) return NextResponse.json({ error: "CANNOT_MODERATE_ADMIN" }, { status: 403 });
+
+  const status = action === "SUSPEND" ? "SUSPENDED" : action === "DELETE" ? "DELETED" : "ACTIVE";
+  await prisma.user.update({ where: { id: targetUserId }, data: { status } });
+  // Audit trail: mọi moderatio action phải ghi lại (schema: AdminAction).
+  await prisma.adminAction.create({
+    data: { adminId: userId, targetId: targetUserId, action, reason: `status -> ${status}` },
+  });
   return NextResponse.json({ status: "OK" });
 }

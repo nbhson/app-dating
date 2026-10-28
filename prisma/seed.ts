@@ -52,7 +52,13 @@ const ADMIN_EMAIL = "nbhson43@gmail.com";
 
 async function main() {
   console.log("Seeding...");
-  const demoPasswordHash = await bcrypt.hash("Lumen123!", 10);
+  // KHÔNG hardcode password vào repo. Yêu cầu qua env; thiếu → abort thay vì
+  // tạo admin với password công khai.
+  const demoPassword = process.env.SEED_DEMO_PASSWORD;
+  if (!demoPassword || demoPassword.length < 12) {
+    throw new Error("Set SEED_DEMO_PASSWORD (>= 12 chars) before seeding");
+  }
+  const demoPasswordHash = await bcrypt.hash(demoPassword, 10);
   // Ensure primary admin exists
   {
     let admin = await prisma.user.findUnique({ where: { email: ADMIN_EMAIL } });

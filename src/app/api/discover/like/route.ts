@@ -2,13 +2,30 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { todayKey } from "@/lib/utils";
+import { DAILY_LIKE_LIMIT, likesToday } from "@/lib/daily";
 
 export async function POST(req: Request) {
   const session = await auth();
   const userId = (session?.user as any)?.id as string | undefined;
   if (!userId) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   const { toUserId, comment, anchor, isPriority } = await req.json();
-  if (!toUserId || toUserId === userId) return NextResponse.json({ error: "INVALID_TARGET" }, { status: 400 });
+  if (!toUserId || typeof toUserId !== "string" || toUserId === userId) {
+    return NextResponse.json({ error: "INVALID_TARGET" }, { status: 400 });
+  }
+
+  // Validate target tồn tại + đang ACTIVE: trước đây id rác đi thẳng xuống
+  // like.create → Prisma FK violation = unhandled 500.
+  const target = await prisma.user.findUnique({ where: { id: toUserId }, select: { status: true } });
+  if (!target || target.status !== "ACTIVE") {
+    return NextResponse.json({ error: "TARGET_NOT_AVAILABLE" }, { status: 404 });
+  }
+
+  // Daily like cap: dailyUsage.likes được increment nhưng KHÔNG BAO GIỜ được
+  // check — spam like vô hạn. Chặn trước khi tăng.
+  const likesUsed = await likesToday(userId);
+  if (likesUsed >= DAILY_LIKE_LIMIT) {
+    return NextResponse.json({ error: "DAILY_LIKE_LIMIT_REACHED", limit: DAILY_LIKE_LIMIT }, { status: 429 });
+  }
   // stamps check for priority
   if (isPriority) {
     const me = await prisma.user.findUnique({ where: { id: userId }, select: { stamps: true, premiumUntil: true } });

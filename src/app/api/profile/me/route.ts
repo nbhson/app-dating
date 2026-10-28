@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getAge } from "@/lib/utils";
 
 export async function GET() {
   const session = await auth();
@@ -19,23 +20,62 @@ export async function PATCH(req: Request) {
   const userId = (session?.user as any)?.id as string | undefined;
   if (!userId) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   const body = await req.json();
-  const { firstName, dob, gender, location, latitude, longitude, bio, occupation, education, interests, preferences, promptAnswers, voiceUrl, voiceDuration, isIncognito, height, languages, religion, wantKids, smoking, drinking } = body;
+  const { firstName, dob, gender, location, latitude, longitude, bio, occupation, education, interests, preferences, promptAnswers, voiceDuration, isIncognito, height, languages, religion, wantKids, smoking, drinking } = body;
+  // voiceUrl đã bị loại khỏi PATCH: trước đây client tự truyền chuỗi bất kỳ →
+  // lưu verbatim rồi render `<a href>` + `<audio src>` → `javascript:` URL
+  // stored XSS. Giá trị này chỉ được đặt server-side qua /api/profile/voice.
+  if (body.voiceUrl !== undefined) {
+    return NextResponse.json({ error: "VOICE_URL_IMMUTABLE", message: "voiceUrl chỉ được đặt qua /api/profile/voice" }, { status: 400 });
+  }
 
   if (interests && !Array.isArray(interests)) return NextResponse.json({ error: "INVALID_INTERESTS" }, { status: 400 });
+  // Validate dạng + độ dài trước khi ghi DB (trước đây unbounded).
+  const asBounded = (v: unknown, max: number): string | undefined =>
+    typeof v === "string" ? v.slice(0, max) : undefined;
+  const boundedFirstName = firstName !== undefined ? asBounded(firstName, 30) : undefined;
+  const boundedBio = bio !== undefined ? asBounded(bio, 500) : undefined;
+  const boundedOccupation = occupation !== undefined ? asBounded(occupation, 100) : undefined;
+  const boundedEducation = education !== undefined ? asBounded(education, 100) : undefined;
+  const boundedLocation = location !== undefined ? asBounded(location, 200) : undefined;
+  if (firstName !== undefined && !boundedFirstName) {
+    return NextResponse.json({ error: "INVALID_FIRST_NAME" }, { status: 400 });
+  }
+  // Dob: phải là date hợp lệ + đủ 18+ (dating app — age gate bắt buộc).
+  if (dob !== undefined) {
+    const d = new Date(dob);
+    if (Number.isNaN(d.getTime()) || getAge(d) < 18) {
+      return NextResponse.json({ error: "INVALID_DOB", message: "Bạn phải từ 18 tuổi trở lên" }, { status: 400 });
+    }
+  }
+  // minAge/maxAge preference: chặn < 18 và min > max.
+  if (preferences) {
+    const minAge = preferences.minAge;
+    const maxAge = preferences.maxAge;
+    if (minAge !== undefined && (!Number.isInteger(minAge) || minAge < 18 || minAge > 99)) {
+      return NextResponse.json({ error: "INVALID_AGE_RANGE" }, { status: 400 });
+    }
+    if (maxAge !== undefined && (!Number.isInteger(maxAge) || maxAge < 18 || maxAge > 99)) {
+      return NextResponse.json({ error: "INVALID_AGE_RANGE" }, { status: 400 });
+    }
+    if (minAge !== undefined && maxAge !== undefined && minAge > maxAge) {
+      return NextResponse.json({ error: "INVALID_AGE_RANGE" }, { status: 400 });
+    }
+  }
 
   const updateData: any = {};
-  if (firstName !== undefined) updateData.firstName = firstName;
+  if (boundedFirstName !== undefined) updateData.firstName = boundedFirstName;
   if (dob !== undefined) updateData.dob = new Date(dob);
   if (gender !== undefined) updateData.gender = gender;
-  if (location !== undefined) updateData.location = location;
+  if (boundedLocation !== undefined) updateData.location = boundedLocation;
   if (latitude !== undefined) updateData.latitude = latitude === null ? null : Number(latitude);
   if (longitude !== undefined) updateData.longitude = longitude === null ? null : Number(longitude);
-  if (bio !== undefined) updateData.bio = bio;
-  if (occupation !== undefined) updateData.occupation = occupation;
-  if (education !== undefined) updateData.education = education;
+  if (boundedBio !== undefined) updateData.bio = boundedBio;
+  if (boundedOccupation !== undefined) updateData.occupation = boundedOccupation;
+  if (boundedEducation !== undefined) updateData.education = boundedEducation;
   if (interests !== undefined) updateData.interests = JSON.stringify(interests);
-  if (voiceUrl !== undefined) updateData.voiceUrl = voiceUrl;
-  if (voiceDuration !== undefined) updateData.voiceDuration = voiceDuration;
+  if (voiceDuration !== undefined) {
+    updateData.voiceDuration = Math.min(30, Math.max(3, Number(voiceDuration) || 15));
+  }
 
   let profile = await prisma.profile.findUnique({ where: { userId } });
   if (profile) {
@@ -45,17 +85,17 @@ export async function PATCH(req: Request) {
     profile = await prisma.profile.create({
       data: {
         userId,
-        firstName,
+        firstName: boundedFirstName!,
         dob: new Date(dob),
         gender,
-        location,
+        location: boundedLocation ?? null,
         latitude: latitude !== undefined ? Number(latitude) : null,
         longitude: longitude !== undefined ? Number(longitude) : null,
-        bio,
-        occupation,
-        education,
+        bio: boundedBio ?? null,
+        occupation: boundedOccupation ?? null,
+        education: boundedEducation ?? null,
         interests: interests ? JSON.stringify(interests) : null,
-        voiceUrl: voiceUrl ?? null,
+        voiceUrl: null,
         voiceDuration: voiceDuration ?? null,
       },
     });
@@ -96,14 +136,16 @@ export async function PATCH(req: Request) {
   }
 
   if (Array.isArray(promptAnswers)) {
-    // replace up to 3
+    // replace up to 3 — trong MỘT transaction: trước đây deleteMany rồi create
+    // từng dòng; lỗi giữa chừng/race là mất sạch answers cũ.
     const toKeep = promptAnswers.slice(0, 3);
-    await prisma.promptAnswer.deleteMany({ where: { userId } });
-    for (const pa of toKeep) {
-      if (pa.question && pa.answer && pa.answer.trim().length >= 4) {
-        await prisma.promptAnswer.create({ data: { userId, question: pa.question, answer: pa.answer.trim().slice(0, 300) } });
-      }
-    }
+    const valid = toKeep
+      .filter((pa: any) => pa.question && pa.answer && pa.answer.trim().length >= 4)
+      .map((pa: any) => ({ userId, question: String(pa.question).slice(0, 200), answer: pa.answer.trim().slice(0, 300) }));
+    await prisma.$transaction([
+      prisma.promptAnswer.deleteMany({ where: { userId } }),
+      prisma.promptAnswer.createMany({ data: valid }),
+    ]);
   }
 
   const user = await prisma.user.findUnique({

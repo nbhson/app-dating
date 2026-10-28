@@ -23,7 +23,22 @@ export async function POST(req: Request) {
   const buffer = Buffer.from(bytes);
   const uploadDir = path.join(process.cwd(), "public", "uploads", userId);
   await mkdir(uploadDir, { recursive: true });
-  const ext = file.name.split(".").pop() || "jpg";
+  // SECURITY: extension phải suy ra từ MIME đã allowlist ở trên, KHÔNG lấy từ
+  // file.name (client kiểm soát hoàn toàn). Trước đây upload `x.svg` với MIME
+  // khai báo image/png được ghi xuống public/uploads và serve same-origin →
+  // stored XSS (SVG chạy script trong origin của app).
+  const EXT_BY_MIME: Record<string, string> = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+    "image/avif": "avif",
+  };
+  const ext = EXT_BY_MIME[file.type];
+  // Defense-in-depth: chặn thêm magic bytes của SVG/XML (SVG vẫn qua được nếu
+  // browser sniff nội dung thay vì tin Content-Type).
+  if (!ext || /^\s*<\??(svg|xml)/i.test(buffer.subarray(0, 256).toString("utf8"))) {
+    return NextResponse.json({ error: "INVALID_TYPE" }, { status: 400 });
+  }
   const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
   const filepath = path.join(uploadDir, filename);
   await writeFile(filepath, buffer);

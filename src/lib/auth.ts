@@ -107,13 +107,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           }
           // NOTE: admin privileges are granted ONLY via DB seed — never auto-promoted
           // at login time (prevents account-takeover → admin escalation).
-          // legacy/demo users without password -> set password on first use
+          // Account OAuth-only (passwordHash null) KHÔNG được set password qua
+          // đường login — ai biết email là chiếm được account.
           if (!user.passwordHash) {
-            const passwordHash = await bcrypt.hash(password, 10);
-            user = await prisma.user.update({
-              where: { id: user.id },
-              data: { passwordHash, lastActiveAt: new Date() },
-            });
+            return null;
           } else {
             const ok = await bcrypt.compare(password, user.passwordHash);
             if (!ok) return null;

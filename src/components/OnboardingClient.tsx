@@ -106,7 +106,8 @@ export default function OnboardingClient({ initial }: Props) {
         interests: form.interests,
         preferences: { interestedIn: form.interestedIn, intent: form.intent, minAge: form.minAge, maxAge: form.maxAge, maxDistance: form.maxDistance },
         promptAnswers: prompts.filter((p) => p.answer.trim().length >= 4),
-        voiceUrl: voiceUrl ?? undefined,
+        // voiceUrl không gửi qua PATCH nữa — server từ chối (chỉ đặt qua
+        // /api/profile/voice sau khi upload file).
       }),
     });
     if (!res.ok) {

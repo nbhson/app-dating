@@ -86,7 +86,8 @@ export async function GET() {
     bio: candidate.profile.bio,
     location: candidate.profile.location ? `${candidate.profile.location}` : "Nearby",
     distance,
-    distanceKm,
+    // distanceKm (số thô) bị loại khỏi response: chỉ trả chuỗi đã obscure —
+    // trả raw float thì client lấy được vị trí chính xác candidate (privacy).
     occupation: candidate.profile.occupation,
     education: candidate.profile.education,
     interests: candidate.profile.interests ? JSON.parse(candidate.profile.interests) : [],

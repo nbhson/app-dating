@@ -20,10 +20,15 @@ export async function POST(req: Request) {
   const name = `${userId}-${Date.now()}.${ext}`;
   await writeFile(path.join(dir, name), bytes);
   const url = `/uploads/voices/${name}`;
-  await prisma.profile.upsert({
+  // Chỉ update profile CÓ SẴN — upsert cũ tự tạo profile rác ("You", dob
+  // 1998, WOMAN) hiện trong discovery như một user thật.
+  const existing = await prisma.profile.findUnique({ where: { userId }, select: { userId: true } });
+  if (!existing) {
+    return NextResponse.json({ error: "NO_PROFILE", message: "Hoàn thiện hồ sơ trước khi thêm giọng nói" }, { status: 400 });
+  }
+  await prisma.profile.update({
     where: { userId },
-    update: { voiceUrl: url, voiceDuration: Math.min(30, Math.max(3, duration)) },
-    create: { userId, firstName: "You", dob: new Date("1998-01-01"), gender: "WOMAN", voiceUrl: url, voiceDuration: Math.min(30, Math.max(3, duration)) },
+    data: { voiceUrl: url, voiceDuration: Math.min(30, Math.max(3, duration)) },
   });
   return NextResponse.json({ url, duration });
 }

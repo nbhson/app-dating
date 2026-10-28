@@ -29,3 +29,12 @@ export async function incrementView(userId: string) {
   });
   return usage;
 }
+
+/** Số bưu thiếp tối đa mỗi ngày — chống like spam (trước đây không cap). */
+export const DAILY_LIKE_LIMIT = 50;
+
+/** Số like đã dùng trong ngày của user. */
+export async function likesToday(userId: string): Promise<number> {
+  const usage = await getTodayUsage(userId);
+  return usage.likes;
+}
