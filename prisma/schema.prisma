@@ -389,3 +389,17 @@ model VerificationRequest {
   @@index([userId])
   @@index([status])
 }
+
+// Round 3 — shared rate-limit storage backend (RATE_LIMIT_BACKEND=prisma).
+// Fixed window anchored at first hit: `windowStart` = first request of the
+// window, `expiresAt` = windowStart + windowMs. One row per key, PK upsert.
+// Rows are only written by lib/ratelimit.ts; expired rows are overwritten
+// in place (no cron needed). Postgres migration keeps this model unchanged.
+model RateLimitBucket {
+  key         String   @id
+  windowStart DateTime
+  count       Int      @default(0)
+  expiresAt   DateTime
+
+  @@index([expiresAt])
+}

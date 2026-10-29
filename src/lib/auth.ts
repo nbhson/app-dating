@@ -11,30 +11,22 @@ export const ADMIN_NAME = "admin";
 const LEGACY_ADMIN_EMAIL = "admin@admin.admin";
 const ADMIN_EMAILS = new Set(ADMIN_EMAIL ? [ADMIN_EMAIL] : []);
 
-// --- In-memory login rate limiting (per email + per IP-less global bucket) ---
-// Mitigates brute-force password guessing. For multi-instance deployments,
-// replace with a shared store (e.g. Redis/Upstash).
+// --- Login rate limiting (per email, storage-abstracted) ---
+// Mitigates brute-force password guessing. Backend is selectable via
+// RATE_LIMIT_BACKEND=memory (default, per-process) | prisma (shared
+// RateLimitBucket table — works across instances/restarts). See
+// lib/ratelimit.ts for the store contract.
+import { rateLimit, getRateLimitStore } from "./ratelimit";
+
 const LOGIN_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
 const LOGIN_MAX_ATTEMPTS = 10;
-const loginAttempts = new Map<string, { count: number; resetAt: number }>();
 
-function checkLoginRateLimit(key: string): boolean {
-  const now = Date.now();
-  const entry = loginAttempts.get(key);
-  if (!entry || entry.resetAt < now) {
-    loginAttempts.set(key, { count: 1, resetAt: now + LOGIN_WINDOW_MS });
-    // opportunistic cleanup to avoid unbounded growth
-    if (loginAttempts.size > 1000) {
-      for (const [k, v] of loginAttempts) if (v.resetAt < now) loginAttempts.delete(k);
-    }
-    return true;
-  }
-  entry.count += 1;
-  return entry.count <= LOGIN_MAX_ATTEMPTS;
+async function checkLoginRateLimit(key: string): Promise<boolean> {
+  return rateLimit(key, LOGIN_WINDOW_MS, LOGIN_MAX_ATTEMPTS);
 }
 
-function clearLoginRateLimit(key: string): void {
-  loginAttempts.delete(key);
+async function clearLoginRateLimit(key: string): Promise<void> {
+  await getRateLimitStore().reset(key);
 }
 
 function isAdminEmail(email: string | null | undefined): boolean {
@@ -78,7 +70,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!email || !password) return null;
         if (password.length < 8) return null;
 
-        if (!checkLoginRateLimit(email)) {
+        if (!(await checkLoginRateLimit(email))) {
           console.warn(`[auth] Rate limit exceeded for ${email}`);
           return null; // too many attempts — deny without leaking timing
         }
@@ -119,7 +111,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           }
         }
         if (user.status === "SUSPENDED" || user.status === "DELETED") return null;
-        clearLoginRateLimit(email); // successful auth — reset counter
+        await clearLoginRateLimit(email); // successful auth — reset counter
         return { id: user.id, email: user.email, name: user.name, image: user.avatarUrl };
       },
     }),
