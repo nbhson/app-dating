@@ -3,11 +3,30 @@ import { useState } from "react";
 import { signOut } from "next-auth/react";
 import { useI18n } from "@/lib/i18n/context";
 import { usePopup } from "@/components/ui/PopupProvider";
+import { computeProfileCompleteness } from "@/lib/completeness";
 
 export default function ProfileClient({ user }: { user: any }) {
   const { t, trans, locale } = useI18n();
   const { toast, confirm, prompt } = usePopup();
   const promptQs = (t.profile.promptQuestions as unknown as string[]) ?? [];
+  // Round 2 feature: completeness dùng đúng công thức server (lib/completeness).
+  const completeness = computeProfileCompleteness({
+    profile: user.profile ?? null,
+    photos: user.photos ?? [],
+    promptAnswers: user.promptAnswers ?? [],
+    height: user.height,
+    languages: user.languages ?? null,
+    religion: user.religion ?? null,
+  });
+  const MISSING_LABELS: Record<string, string> = {
+    photo: t.profile.missingPhoto,
+    bio: t.profile.missingBio,
+    prompts: t.profile.missingPrompts,
+    interests: t.profile.missingInterests,
+    voice: t.profile.missingVoice,
+    location: t.profile.missingLocation,
+    extras: t.profile.missingExtras,
+  };
   const [form, setForm] = useState({
     bio: user.profile?.bio ?? "",
     occupation: user.profile?.occupation ?? "",
@@ -68,11 +87,18 @@ export default function ProfileClient({ user }: { user: any }) {
   async function save() {
     setSaving(true);
     const langs = extra.languages.split(",").map((s:string)=>s.trim()).filter(Boolean);
-    await fetch("/api/profile/me", {
+    const res = await fetch("/api/profile/me", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...form, interests: form.interests, preferences: pref, promptAnswers: prompts.map((p:any)=>({question:p.question, answer:p.answer})), latitude: coords?.lat ?? null, longitude: coords?.lng ?? null, isIncognito, height: extra.height ? Number(extra.height) : null, languages: langs, religion: extra.religion || null, wantKids: extra.wantKids || null, smoking: extra.smoking || null, drinking: extra.drinking || null }),
     });
+    // Round 2 (R2-6): surface lỗi thật — trước đây luôn toast "Đã lưu" kể cả 400.
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      setSaving(false);
+      toast(trans("profile.saveError", { error: d.error ?? res.status }), "error");
+      return;
+    }
     if (dailyQ && dailyA.trim().length >= 4) {
       await fetch("/api/daily-answer", { method: "POST", headers: { "Content-Type":"application/json" }, body: JSON.stringify({ answer: dailyA }) });
     }
@@ -110,7 +136,40 @@ export default function ProfileClient({ user }: { user: any }) {
       <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar overscroll-contain">
         <div className="max-w-2xl mx-auto w-full px-4 md:px-6 pb-[88px] md:pb-4 space-y-4 md:space-y-5">
 
-      <div className={card}>
+      {/* Round 2 feature: profile completeness */}
+      <div className={card} id="completeness" aria-label={t.profile.completenessTitle}>
+        <div className="flex items-center gap-4">
+          <div
+            className="relative w-14 h-14 shrink-0 rounded-full grid place-items-center"
+            role="progressbar"
+            aria-valuenow={completeness.score}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label={t.profile.completenessTitle}
+            style={{ background: `conic-gradient(#FF4D6D ${completeness.score}%, #FFE8EC 0)` }}
+          >
+            <div className="absolute inset-[4px] rounded-full bg-white grid place-items-center">
+              <span className="text-[13px] font-bold text-[#2E1A22]">{completeness.score}%</span>
+            </div>
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-semibold text-sm">{t.profile.completenessTitle}</div>
+            <div className="text-xs text-[#8E6B75] mt-0.5">{t.profile.completenessHint}</div>
+            {completeness.missing.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {completeness.missing.map((m) => (
+                  <span key={m} className="px-2.5 py-1 rounded-full bg-white border border-[#FCE8EC] text-[11px] font-semibold text-[#8E6B75]">{MISSING_LABELS[m] ?? m}</span>
+                ))}
+              </div>
+            )}
+            {completeness.missing.length === 0 && (
+              <div className="text-xs font-semibold text-emerald-600 mt-2">✓ {(t.profile as any).verificationStatusVerified}</div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className={card} id="photos">
         <div className="absolute -right-8 -top-8 w-24 h-24 rounded-full bg-[#FF8FA3]/10 blur-2xl pointer-events-none" />
         <h2 className="font-semibold flex items-center gap-2">{t.profile.photos} <span className="text-xs font-mono bg-[#FFF0F3] border border-[#FCE8EC] px-2 py-1 rounded-full text-[#8E6B75]">{photos.length}/6</span> <span className="ml-auto text-xs text-[#B08A95]">{t.profile.tapToDelete}</span></h2>
         <div className="grid grid-cols-3 gap-3">
@@ -125,6 +184,7 @@ export default function ProfileClient({ user }: { user: any }) {
                   setPhotos((prev) => prev.filter((x) => x.id !== p.id));
                   toast("Đã xóa ảnh", "success");
                 }}
+                aria-label={`${t.profile.deletePromptBtn} ${t.profile.photos}`}
                 className="absolute top-2 right-2 w-7 h-7 rounded-full bg-[#2E1A22]/70 backdrop-blur text-white text-xs grid place-items-center hover:bg-[#2E1A22] transition"
               >
                 ✕
@@ -144,7 +204,7 @@ export default function ProfileClient({ user }: { user: any }) {
           {voiceUrl ? (
             <>
               <audio controls src={voiceUrl} className="flex-1 h-8 rounded-full" />
-              <button onClick={async()=>{ await fetch("/api/profile/voice",{method:"DELETE"}); setVoiceUrl(null); toast("Đã xóa voice", "success");}} className="text-xs font-medium underline text-[#8E6B75]">{t.profile.deleteVoice}</button>
+              <button onClick={async()=>{ await fetch("/api/profile/voice",{method:"DELETE"}); setVoiceUrl(null); toast("Đã xóa voice", "success");}} aria-label={t.profile.deleteVoice} className="text-xs font-medium underline text-[#8E6B75]">{t.profile.deleteVoice}</button>
             </>
           ) : (
             <label className="ml-auto text-xs font-semibold border border-[#FCE8EC] rounded-full px-4 py-2 bg-white hover:bg-[#FFF0F3] cursor-pointer transition">
@@ -256,9 +316,13 @@ export default function ProfileClient({ user }: { user: any }) {
           {!isVerified && (
             <label className="text-xs font-semibold border border-[#FCE8EC] rounded-full px-4 py-2 bg-white hover:bg-[#FFF0F3] cursor-pointer transition">
               <input type="file" accept="image/*" className="hidden" onChange={async(e)=>{
+                // Round 2 fix (R2-1): gửi multipart FormData — trước đây gửi
+                // photoUrl: URL.createObjectURL(file) qua JSON → server luôn
+                // 400 MISSING_PHOTO, flow xác minh hỏng hoàn toàn từ UI.
                 const f=e.target.files?.[0]; if(!f) return;
-                const r=await fetch("/api/verification", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({photoUrl: URL.createObjectURL(f)})});
-                if(r.ok) { toast((t.profile as any).verificationSubmitted ?? "Đã gửi yêu cầu xác minh", "success"); setVerifyStatus("PENDING"); } else { const d=await r.json(); toast(d.error, "error"); }
+                const fd=new FormData(); fd.append("file", f);
+                const r=await fetch("/api/verification", {method:"POST", body: fd});
+                if(r.ok) { toast((t.profile as any).verificationSubmitted ?? "Đã gửi yêu cầu xác minh", "success"); setVerifyStatus("PENDING"); } else { const d=await r.json().catch(()=>({})); toast(d.error === "ALREADY_PENDING" ? (t.profile as any).verificationAlreadyPending : (d.error ?? "ERROR"), "error"); }
               }} />
               {(t.profile as any).sendVerification ?? "Gửi xác minh"}
             </label>

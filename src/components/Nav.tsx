@@ -21,6 +21,8 @@ export default function Nav() {
   const [unreadTotal, setUnreadTotal] = useState(0);
   const [unreadByMatch, setUnreadByMatch] = useState(0);
   const [notifUnread, setNotifUnread] = useState(0);
+  // Round 2 (R2-8): tiến trình trong ngày lấy thật từ API — trước đây hardcode 13/20.
+  const [usage, setUsage] = useState<{ viewed: number; limit: number } | null>(null);
 
   useEffect(() => {
     fetch("/api/admin/stats").then(r=>{ if(r.ok) setIsAdmin(true); }).catch(()=>{});
@@ -45,6 +47,8 @@ export default function Nav() {
         }
         const rn = await fetch("/api/notifications?unread=true").then(x=>x.json()).catch(()=>null);
         if (rn && !cancelled) setNotifUnread(rn.unreadCount ?? 0);
+        const ru = await fetch("/api/usage/today").then(x=>x.json()).catch(()=>null);
+        if (ru && ru.viewed !== undefined && !cancelled) setUsage({ viewed: ru.viewed, limit: ru.limit });
       } catch {}
     }
     load();
@@ -107,7 +111,7 @@ export default function Nav() {
               );
             })}
             {/* notifications quick access */}
-            <button onClick={async()=>{ const r=await fetch("/api/notifications"); const d=await r.json(); const list=(d.notifications??[]) as any[]; if(list.length===0){ showAlert({ title: (t as any).notifications?.title ?? "Thông báo", description: (t as any).notifications?.empty ?? "Không có thông báo", icon: "🔔" }); } else { const body = list.slice(0,5).map((n:any)=>`• ${n.title}${n.body?`: ${n.body}`:""}`).join('\n') + (list.length>5?`\n+ ${list.length-5} nữa`:""); showAlert({ title: `${(t as any).notifications?.title ?? "Thông báo"} (${list.length})`, description: body, icon: "🔔" }); } fetch("/api/notifications",{method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify({markAll:true})}).then(()=>setNotifUnread(0));}} className="px-4 py-3 rounded-[20px] flex items-center gap-3.5 bg-white/60 border border-white/40 hover:bg-white text-[#2E1A22] transition">
+            <button onClick={async()=>{ const r=await fetch("/api/notifications"); const d=await r.json(); const list=(d.notifications??[]) as any[]; if(list.length===0){ showAlert({ title: (t as any).notifications?.title ?? "Thông báo", description: (t as any).notifications?.empty ?? "Không có thông báo", icon: "🔔" }); } else { const body = list.slice(0,5).map((n:any)=>`• ${n.title}${n.body?`: ${n.body}`:""}`).join('\n') + (list.length>5?`\n+ ${list.length-5} nữa`:""); showAlert({ title: `${(t as any).notifications?.title ?? "Thông báo"} (${list.length})`, description: body, icon: "🔔" }); } fetch("/api/notifications",{method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify({markAll:true})}).then(()=>setNotifUnread(0));}} aria-label={`${(t.nav as any).notifications ?? "Thông báo"}${notifUnread>0 ? ` (${notifUnread})` : ""}`} className="px-4 py-3 rounded-[20px] flex items-center gap-3.5 bg-white/60 border border-white/40 hover:bg-white text-[#2E1A22] transition">
               <span className="w-9 h-9 rounded-full bg-[#FFF0F3] border border-[#FCE8EC] grid place-items-center text-[13px] relative">🔔 {notifUnread>0 && <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-[#FF4D6D] text-white text-[9px] font-bold grid place-items-center border-2 border-white">{notifUnread}</span>}</span>
               <div className="text-left"><div className="text-[13px] font-semibold">{(t.nav as any).notifications ?? (t as any).notifications?.title ?? "Thông báo"}</div><div className="text-[11px] font-mono text-[#B08A95]">{notifUnread>0 ? trans("nav.newNotifications" as any, {count: notifUnread}) || `${notifUnread} mới` : (t.nav as any).noNewNotifications ?? "Không có mới"}</div></div>
             </button>
@@ -150,13 +154,13 @@ export default function Nav() {
               </div>
               <div className="text-[11.5px] text-[#8E6B75] leading-relaxed mt-2">{t.nav.cardsDesc}</div>
               <div className="mt-3 h-1.5 bg-[#FFF0F3] rounded-full overflow-hidden border border-[#FCE8EC]">
-                <div className="h-full w-[65%] gradient-primary rounded-full" />
+                <div className="h-full gradient-primary rounded-full" style={{ width: usage ? `${Math.min(100, (usage.viewed / usage.limit) * 100)}%` : "0%" }} />
               </div>
-              <div className="text-[10px] font-mono text-[#B08A95] mt-1.5">{trans("nav.todayProgress", { viewed: 13, limit: 20 })}</div>
+              <div className="text-[10px] font-mono text-[#B08A95] mt-1.5">{usage ? trans("nav.todayProgress", { viewed: usage.viewed, limit: usage.limit }) : "—"}</div>
             </div>
             <div className="flex flex-col items-center gap-2">
               <LanguageSwitcher variant="pill" />
-              <button onClick={() => signOut({ callbackUrl: "/" })} className="w-full h-10 rounded-full bg-white border border-[#FCE8EC] text-sm font-semibold text-[#2E1A22] hover:bg-[#FFF0F3] hover:border-[#FFD6DE] transition flex items-center justify-center gap-2 shadow-sm">
+              <button onClick={() => signOut({ callbackUrl: "/" })} aria-label={(t.profile as any).logout ?? "Đăng xuất"} className="w-full h-10 rounded-full bg-white border border-[#FCE8EC] text-sm font-semibold text-[#2E1A22] hover:bg-[#FFF0F3] hover:border-[#FFD6DE] transition flex items-center justify-center gap-2 shadow-sm">
                 <span className="text-[13px]">↪</span> {(t.profile as any).logout ?? "Đăng xuất"}
               </button>
               <div className="flex items-center justify-center gap-2 text-[11px] font-mono text-[#B08A95]">

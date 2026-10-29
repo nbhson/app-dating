@@ -4,6 +4,7 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { useI18n } from "@/lib/i18n/context";
 import { usePopup } from "@/components/ui/PopupProvider";
+import { REPORT_REASONS } from "@/lib/domain";
 
 type Prompt = { id: string; question: string; answer: string };
 type Profile = {
@@ -44,6 +45,30 @@ export default function DiscoverClient() {
   const [reportOpen, setReportOpen] = useState(false);
   const [isPriority, setIsPriority] = useState(false);
   const [favLoading, setFavLoading] = useState(false);
+  // Round 2 feature: quick filters ngay trên Discover — persist vào Preference
+  // qua PATCH /api/profile/me (dùng lại field có sẵn, recommendation engine
+  // tự áp dụng cho profile kế tiếp).
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [filters, setFilters] = useState({ verifiedOnly: false, hasVoiceOnly: false, hasPhotoOnly: false, maxDistance: 50 });
+  const [filtersActive, setFiltersActive] = useState(0);
+  const [stamps, setStamps] = useState<number | null>(null);
+
+  async function applyFilters(next: typeof filters) {
+    setFilters(next);
+    const res = await fetch("/api/profile/me", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ preferences: next }),
+    });
+    if (res.ok) {
+      setFiltersOpen(false);
+      toast(t.discover.applyFilters, "success");
+      fetchNext();
+    } else {
+      const d = await res.json().catch(() => ({}));
+      toast(d.error ?? "ERROR", "error");
+    }
+  }
 
   async function fetchNext() {
     setLoading(true);
@@ -101,7 +126,23 @@ export default function DiscoverClient() {
       .then((r) => r.json())
       .then((d) => {
         if (d.viewed !== undefined) setUsage({ viewed: d.viewed, limit: d.limit, remaining: d.limit - d.viewed });
+        if (d.stamps !== undefined) setStamps(d.stamps);
       });
+    fetch("/api/profile/me")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.user?.preferences) {
+          const f = {
+            verifiedOnly: !!d.user.preferences?.verifiedOnly,
+            hasVoiceOnly: !!d.user.preferences?.hasVoiceOnly,
+            hasPhotoOnly: !!d.user.preferences?.hasPhotoOnly,
+            maxDistance: d.user.preferences?.maxDistance ?? 50,
+          };
+          setFilters(f);
+          setFiltersActive([f.verifiedOnly, f.hasVoiceOnly, f.hasPhotoOnly].filter(Boolean).length);
+        }
+      })
+      .catch(() => {});
     fetch("/api/daily-question")
       .then((r) => r.json())
       .then((d) => { if (d.question) setDailyQ(d.question); })
@@ -121,7 +162,7 @@ export default function DiscoverClient() {
     if (type === "like") {
       body.comment = comment.trim();
       body.anchor = selectedAnchor;
-      body.isPriority = isPriority;
+      body.isPriority = isPriority && (stamps ?? 0) > 0;
     }
     const res = await fetch(`/api/discover/${type}`, {
       method: "POST",
@@ -129,6 +170,9 @@ export default function DiscoverClient() {
       body: JSON.stringify(body),
     });
     const data = await res.json();
+    if (res.ok && type === "like" && isPriority && (stamps ?? 0) > 0) {
+      setStamps((s) => Math.max(0, (s ?? 0) - 1));
+    }
     if (type === "like" && (data.status === "MATCH_CREATED" || data.status === "MATCH_EXISTS")) {
       setMatch({ matchId: data.matchId });
     } else {
@@ -203,7 +247,21 @@ export default function DiscoverClient() {
                 <span className="hidden lg:inline text-[10px] font-mono text-[#B08A95]">{trans("discover.remaining", { count: usage.remaining })}</span>
               </div>
             )}
-            <Link href="/matches" className="relative w-10 h-10 rounded-full bg-white border border-[#FCE8EC] grid place-items-center hover:bg-[#FFF0F3] hover:border-[#FFD6DE] transition shadow-sm group">
+            <button
+              onClick={() => setFiltersOpen((v) => !v)}
+              aria-label={t.discover.filtersTitle}
+              aria-expanded={filtersOpen}
+              title={t.discover.filtersTitle}
+              className={`relative w-10 h-10 rounded-full grid place-items-center transition shadow-sm border ${filtersActive > 0 || filtersOpen ? "bg-[#FF4D6D] text-white border-[#FF4D6D] shadow-[0_4px_12px_rgba(255,77,109,0.3)]" : "bg-white border-[#FCE8EC] hover:bg-[#FFF0F3] hover:border-[#FFD6DE]"}`}
+            >
+              <span className="text-[15px] leading-none">⚙</span>
+              {filtersActive > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#2E1A22] text-white text-[10px] font-bold grid place-items-center border-2 border-white">
+                  {filtersActive}
+                </span>
+              )}
+            </button>
+            <Link href="/matches" aria-label={t.nav.inbox} className="relative w-10 h-10 rounded-full bg-white border border-[#FCE8EC] grid place-items-center hover:bg-[#FFF0F3] hover:border-[#FFD6DE] transition shadow-sm group">
               <span className="text-[15px] group-hover:scale-110 transition">✉</span>
               {unreadTotal > 0 && (
                 <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full gradient-primary text-white text-[10px] font-bold grid place-items-center shadow-[0_2px_8px_rgba(255,77,109,0.4)] border-2 border-white">
@@ -214,6 +272,49 @@ export default function DiscoverClient() {
           </div>
         </div>
       </div>
+
+      {/* Round 2 feature: quick filter sheet — persist vào Preference, áp dụng ngay */}
+      {filtersOpen && (
+        <div className="shrink-0 z-20 px-3 md:px-6 pt-2 pointer-events-none">
+          <div className="max-w-[1020px] mx-auto w-full glass-strong rounded-[20px] md:rounded-[24px] px-4 md:px-5 py-4 space-y-3 shadow-[0_8px_24px_rgba(46,26,34,0.10)] pointer-events-auto" role="group" aria-label={t.discover.filtersTitle}>
+            <div className="flex items-center justify-between">
+              <span className="font-display text-[15px] font-semibold">{t.discover.filtersTitle}</span>
+              <button onClick={() => setFiltersOpen(false)} aria-label={t.common.cancel} className="w-8 h-8 rounded-full grid place-items-center bg-white border border-[#FCE8EC] hover:bg-[#FFF0F3] transition text-xs">✕</button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {([
+                ["verifiedOnly", t.profile.verifiedOnly],
+                ["hasVoiceOnly", t.profile.hasVoiceOnly],
+                ["hasPhotoOnly", t.profile.hasPhotoOnly],
+              ] as const).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => setFilters({ ...filters, [key]: !filters[key] })}
+                  aria-pressed={filters[key]}
+                  className={`px-3.5 py-2 rounded-full text-xs font-semibold border transition-all ${filters[key] ? "bg-[#2E1A22] text-white border-[#2E1A22] shadow-[0_4px_12px_rgba(46,26,34,0.2)]" : "bg-white border-[#FCE8EC] text-[#8E6B75] hover:border-[#FF8FA3]"}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <label className="block">
+              <span className="text-sm font-semibold flex items-center gap-2">{trans("profile.radius", { value: filters.maxDistance })} <span className="ml-auto text-xs font-mono text-[#B08A95]">{t.profile.radiusHint}</span></span>
+              <input type="range" min={5} max={200} step={5} value={filters.maxDistance} onChange={(e) => setFilters({ ...filters, maxDistance: Number(e.target.value) })} aria-label={trans("profile.radius", { value: filters.maxDistance })} className="w-full accent-[#FF4D6D]" />
+            </label>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => applyFilters({ verifiedOnly: false, hasVoiceOnly: false, hasPhotoOnly: false, maxDistance: 200 })}
+                className="h-9 px-4 rounded-full bg-white border border-[#FCE8EC] text-xs font-semibold hover:bg-[#FFF0F3] transition"
+              >
+                {t.discover.expandRadius}
+              </button>
+              <button onClick={() => applyFilters(filters)} className="h-9 px-5 rounded-full btn-primary text-xs font-semibold">
+                {t.discover.applyFilters}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {dailyQ && !loading && profile && (
         <div className="shrink-0 max-w-[1020px] mx-auto w-full px-3 md:px-6 pt-3">
@@ -348,15 +449,16 @@ export default function DiscoverClient() {
                         <div key={i} className={`h-1 flex-1 rounded-full transition-all ${i === photoIdx ? "bg-white shadow-[0_1px_4px_rgba(0,0,0,0.2)]" : "bg-white/40"}`} />
                       ))}
                     </div>
-                    <button onClick={() => setPhotoIdx((p) => Math.max(0, p - 1))} className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/85 backdrop-blur text-[#2E1A22] grid place-items-center text-sm shadow-[0_4px_12px_rgba(0,0,0,0.12)] hover:bg-white transition">‹</button>
-                    <button onClick={() => setPhotoIdx((p) => Math.min(profile.photos.length - 1, p + 1))} className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/85 backdrop-blur text-[#2E1A22] grid place-items-center text-sm shadow-[0_4px_12px_rgba(0,0,0,0.12)] hover:bg-white transition">›</button>
+                    <button onClick={() => setPhotoIdx((p) => Math.max(0, p - 1))} aria-label={t.discover.photoPrev} className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/85 backdrop-blur text-[#2E1A22] grid place-items-center text-sm shadow-[0_4px_12px_rgba(0,0,0,0.12)] hover:bg-white transition">‹</button>
+                    <button onClick={() => setPhotoIdx((p) => Math.min(profile.photos.length - 1, p + 1))} aria-label={t.discover.photoNext} className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/85 backdrop-blur text-[#2E1A22] grid place-items-center text-sm shadow-[0_4px_12px_rgba(0,0,0,0.12)] hover:bg-white transition">›</button>
 
                     <div className="absolute inset-x-0 bottom-0 p-6 bg-gradient-to-t from-[#1F1218]/85 via-[#1F1218]/25 to-transparent text-white">
                       <div className="font-display text-[24px] leading-none font-medium flex items-baseline gap-2">{profile.name}, <span className="font-light">{profile.age}</span> <span className="ml-1 w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] inline-block" /> {(profile as any).isVerified && <span className="w-5 h-5 rounded-full bg-[#1DA1F2] text-white grid place-items-center text-[10px] border-2 border-white">✓</span>} <button
                         onClick={async (e)=>{ e.stopPropagation(); if(!profile) return; setFavLoading(true); const method = (profile as any).isFavorited ? "DELETE" : "POST"; const url = method==="POST" ? "/api/favorites" : `/api/favorites?targetId=${profile.id}`; const body = method==="POST" ? JSON.stringify({targetId: profile.id}) : undefined; const r=await fetch(url, {method, headers: {"Content-Type":"application/json"}, body}); if(r.ok) setProfile((p:any)=> p ? {...p, isFavorited: !p.isFavorited}:p); setFavLoading(false);}}
                         disabled={favLoading}
                         className={`ml-1 w-7 h-7 rounded-full grid place-items-center text-xs border transition ${(profile as any).isFavorited ? 'bg-[#FF4D6D] text-white border-[#FF4D6D]' : 'bg-white/20 backdrop-blur border-white/40 text-white hover:bg-white hover:text-[#FF4D6D]'}`}
-                        title={(profile as any).isFavorited ? 'Bỏ lưu' : 'Lưu'}
+                        title={(profile as any).isFavorited ? t.discover.unfavorite : t.discover.favorite}
+                        aria-label={(profile as any).isFavorited ? t.discover.unfavorite : t.discover.favorite}
                       >{(profile as any).isFavorited ? '♥' : '♡'}</button></div>
                       <div className="text-xs font-medium opacity-90 mt-2 flex flex-wrap items-center gap-2">
                         <span className="bg-white/15 backdrop-blur border border-white/20 px-2.5 py-1 rounded-full">{profile.distance} · {profile.location}</span>
@@ -492,9 +594,12 @@ export default function DiscoverClient() {
                     />
                     <div className="flex items-center gap-2 text-xs">
                       <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                        <input type="checkbox" checked={isPriority} onChange={(e)=>setIsPriority(e.target.checked)} className="accent-[#FF4D6D]" />
-                        <span className={`px-2 py-1 rounded-full border text-[11px] font-semibold ${isPriority ? 'bg-amber-400 border-amber-400 text-white' : 'bg-white border-[#FCE8EC] text-[#8E6B75]'}`}>✦ Tem ưu tiên {isPriority && '(xài 1 tem)'}</span>
+                        <input type="checkbox" checked={isPriority} onChange={(e)=>setIsPriority(e.target.checked)} disabled={(stamps ?? 0) <= 0} className="accent-[#FF4D6D]" />
+                        <span className={`px-2 py-1 rounded-full border text-[11px] font-semibold ${isPriority ? 'bg-amber-400 border-amber-400 text-white' : (stamps ?? 0) <= 0 ? 'bg-white border-[#FCE8EC] text-[#B08A95] opacity-60' : 'bg-white border-[#FCE8EC] text-[#8E6B75]'}`}>✦ Tem ưu tiên {isPriority && '(xài 1 tem)'}</span>
                       </label>
+                      {stamps !== null && (
+                        <span className="text-[11px] font-mono text-[#B08A95]" title={t.discover.priorityHint}>✦ {trans("discover.stampsLeft", { count: stamps })}</span>
+                      )}
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] font-mono text-[#B08A95] font-medium">{comment.length}/140 {comment.length >= 6 && <span className="text-emerald-500">✓</span>}</span>
@@ -557,10 +662,10 @@ export default function DiscoverClient() {
   );
 }
 
-const REPORT_REASONS = ["Fake profile", "Harassment", "Spam", "Inappropriate content", "Scam", "Other"];
+// REPORT_REASONS đã gom vào lib/domain.ts (Round 2) — single source dùng chung với API.
 
 function ReportModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (reason: string, details: string) => void }) {
-  const [reason, setReason] = useState(REPORT_REASONS[2]);
+  const [reason, setReason] = useState<string>(REPORT_REASONS[2]);
   const [details, setDetails] = useState("");
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-[#1A1A1E]/40 backdrop-blur-sm p-4" onClick={onClose}>

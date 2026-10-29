@@ -6,5 +6,6 @@ import { auth } from "@/lib/auth";
  */
 export async function requireUserId(): Promise<string | null> {
   const session = await auth();
-  return ((session?.user as any)?.id as string | undefined) ?? null;
+  const user = session?.user as { id?: string } | undefined;
+  return user?.id ?? null;
 }

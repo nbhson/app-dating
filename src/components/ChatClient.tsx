@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n/context";
 import { usePopup } from "@/components/ui/PopupProvider";
+import { REPORT_REASONS } from "@/lib/domain";
+
 
 export default function ChatClient({ matchId }: { matchId: string }) {
   const { t, trans } = useI18n();
@@ -206,10 +208,10 @@ export default function ChatClient({ matchId }: { matchId: string }) {
   );
 }
 
-const REPORT_REASONS = ["Fake profile", "Harassment", "Spam", "Inappropriate content", "Scam", "Other"];
+// REPORT_REASONS đã gom vào lib/domain.ts (Round 2) — single source dùng chung với API.
 
 function ReportModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (reason: string, details: string) => void }) {
-  const [reason, setReason] = useState(REPORT_REASONS[2]);
+  const [reason, setReason] = useState<string>(REPORT_REASONS[2]);
   const [details, setDetails] = useState("");
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-[#1A1A1E]/40 backdrop-blur-sm p-4" onClick={onClose}>
