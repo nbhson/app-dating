@@ -1,0 +1,500 @@
+// Postgres variant of prisma/schema.prisma — Round 3 migration prep.
+//
+// KHÔNG dùng cho dev flow sqlite. File này chỉ dùng khi deploy Postgres:
+//     DATABASE_URL=postgresql://... npx prisma db push --schema prisma/schema.postgres.prisma
+// Xem plan/postgres-migration.md cho quy trình đầy đủ.
+//
+// Khác biệt so với schema.prisma (sqlite):
+//   1. provider = "postgresql".
+//   2. Native enum thay cho app-layer allowlist trong src/lib/domain.ts —
+//      giá trị ENUM KHỚP 1:1 với domain.ts; khi thêm giá trị mới phải sửa
+//      CẢ HAI nơi (domain.ts cho sqlite + schema này cho Postgres).
+//   3. CHECK constraint không diễn đạt được trong Prisma DSL → áp bằng raw SQL
+//      sau khi db push: prisma/postgres/0001_check_constraints.sql.
+//   4. Tất cả model khác giữ nguyên 1:1 với schema.prisma (kể cả RateLimitBucket).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --- Native enums (thay cho app-layer domain enums) -----------------------
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum VerificationStatus {
+  NONE
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum Gender {
+  MAN
+  WOMAN
+}
+
+enum InterestedIn {
+  MEN
+  WOMEN
+  EVERYONE
+}
+
+enum Intent {
+  LONG_TERM
+  SHORT_TERM
+  FRIENDSHIP
+  EXPLORING
+  UNSURE
+}
+
+enum HabitLevel {
+  NEVER
+  SOCIAL
+  OFTEN
+}
+
+enum PhotoStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum MatchStatus {
+  ACTIVE
+  UNMATCHED
+}
+
+enum ReportStatus {
+  PENDING
+  RESOLVED
+  DISMISSED
+}
+
+enum PromptAnswerStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum VerificationRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum NotificationType {
+  MATCH
+  MESSAGE
+  LIKE
+  SYSTEM
+  VERIFICATION
+}
+
+// Report.reason giữ String (không enum): Prisma 5 DSL không hỗ trợ enum value
+// có dấu cách ("Fake profile") — allowlist 6 giá trị enforce bằng CHECK trong
+// prisma/postgres/0001_check_constraints.sql, vẫn khớp REPORT_REASONS domain.ts.
+
+// --- Models ---------------------------------------------------------------
+
+model User {
+  id               String    @id @default(cuid())
+  email            String?   @unique
+  name             String?
+  avatarUrl        String?
+  passwordHash     String?
+  status           UserStatus @default(ACTIVE)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  lastActiveAt     DateTime  @default(now())
+  isAdmin          Boolean   @default(false)
+  // new fields
+  isVerified       Boolean   @default(false)
+  verifiedAt       DateTime?
+  verificationStatus VerificationStatus @default(NONE)
+  isIncognito      Boolean   @default(false)
+  premiumUntil     DateTime?
+  stamps           Int       @default(3) // priority letters per week
+  stampsResetAt    DateTime?
+  height           Int?
+  languages        String?   // JSON array
+  religion         String?
+  wantKids         String?
+  smoking          HabitLevel?
+  drinking         HabitLevel?
+
+  profile        Profile?
+  photos         ProfilePhoto[]
+  preferences    Preference?
+  likesSent      Like[]    @relation("likesFrom")
+  likesReceived  Like[]    @relation("likesTo")
+  passesSent     Pass[]    @relation("passesFrom")
+  passesReceived Pass[]    @relation("passesTo")
+  matchesA       Match[]   @relation("matchA")
+  matchesB       Match[]   @relation("matchB")
+  blocksSent     Block[]   @relation("blocker")
+  blocksReceived Block[]   @relation("blocked")
+  reportsSent    Report[]  @relation("reporter")
+  reportsReceived Report[] @relation("reported")
+  messages       Message[]
+  dailyUsage     DailyUsage[]
+  promptAnswers  PromptAnswer[]
+  dailyAnswers   DailyAnswer[]
+  accounts       Account[]
+  sessions       Session[]
+  favorites      Favorite[] @relation("favoriter")
+  favoritedBy    Favorite[] @relation("favorited")
+  notifications  Notification[]
+  verificationRequests VerificationRequest[]
+  adminActions   AdminAction[] @relation("adminActor")
+  adminTargets   AdminAction[] @relation("adminTarget")
+
+  @@index([status])
+  @@index([lastActiveAt])
+  @@index([isVerified])
+  @@index([verificationStatus])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  // Round 2 (audit follow-up): composite PRIMARY KEY thay vì chỉ @@unique.
+  // @auth/prisma-adapter truy cập model này qua compound key `identifier_token`
+  // (useVerificationToken / deleteVerificationToken) — `@@id` giữ nguyên key đó
+  // trong PrismaClient trong khi cho model một primary key tường minh, đồng bộ
+  // với mọi model khác trong schema. App không dùng email provider nên bảng
+  // này hiện không được ghi vào runtime.
+  @@id([identifier, token])
+}
+
+model Profile {
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  firstName  String
+  dob        DateTime
+  gender     Gender
+  location   String?
+  latitude   Float?
+  longitude  Float?
+  bio        String?
+  occupation String?
+  education  String?
+  interests  String?  // JSON array
+  voiceUrl   String?
+  voiceDuration Int?  // seconds
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([gender])
+  @@index([dob])
+  @@index([latitude, longitude])
+}
+
+model ProfilePhoto {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  url       String
+  position  Int
+  createdAt DateTime @default(now())
+  status    PhotoStatus @default(APPROVED)
+  moderatedAt DateTime?
+  moderatedBy String?
+
+  @@index([userId, position])
+}
+
+model Preference {
+  id           String @id @default(cuid())
+  userId       String @unique
+  user         User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  interestedIn InterestedIn @default(EVERYONE)
+  minAge       Int    @default(18)
+  maxAge       Int    @default(99)
+  maxDistance  Int?
+  intent       Intent @default(UNSURE)
+  // advanced filters
+  educationFilter String? // JSON array or single
+  hasVoiceOnly Boolean @default(false)
+  hasPhotoOnly Boolean @default(false)
+  verifiedOnly Boolean @default(false)
+}
+
+model Like {
+  id         String   @id @default(cuid())
+  fromUserId String
+  toUserId   String
+  comment    String?
+  promptId   String?
+  isPriority Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  fromUser   User     @relation("likesFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser     User     @relation("likesTo", fields: [toUserId], references: [id], onDelete: Cascade)
+
+  @@unique([fromUserId, toUserId])
+  @@index([fromUserId])
+  @@index([toUserId])
+  @@index([isPriority])
+}
+
+model Pass {
+  id         String   @id @default(cuid())
+  fromUserId String
+  toUserId   String
+  createdAt  DateTime @default(now())
+  fromUser   User     @relation("passesFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser     User     @relation("passesTo", fields: [toUserId], references: [id], onDelete: Cascade)
+
+  @@unique([fromUserId, toUserId])
+  @@index([fromUserId])
+  @@index([toUserId])
+}
+
+model Match {
+  id        String      @id @default(cuid())
+  userAId   String
+  userBId   String
+  createdAt DateTime    @default(now())
+  status    MatchStatus @default(ACTIVE)
+  userA     User        @relation("matchA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB     User        @relation("matchB", fields: [userBId], references: [id], onDelete: Cascade)
+  messages  Message[]
+
+  @@unique([userAId, userBId])
+  @@index([userAId])
+  @@index([userBId])
+  @@index([status])
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  matchId   String
+  senderId  String
+  content   String
+  createdAt DateTime @default(now())
+  read      Boolean  @default(false)
+  readAt    DateTime?
+  editedAt  DateTime?
+  deletedAt DateTime?
+  isEdited  Boolean  @default(false)
+  match     Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  sender    User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([matchId, createdAt])
+  @@index([senderId])
+  @@index([deletedAt])
+}
+
+model Block {
+  id        String   @id @default(cuid())
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
+  blocker   User     @relation("blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked   User     @relation("blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+  @@index([blockerId])
+  @@index([blockedId])
+}
+
+model Report {
+  id         String       @id @default(cuid())
+  reporterId String
+  reportedId String
+  reason     String       // allowlist qua CHECK Report_reason_allowed_chk (xem prisma/postgres/0001_check_constraints.sql)
+  details    String?
+  createdAt  DateTime     @default(now())
+  status     ReportStatus @default(PENDING)
+  reviewedAt DateTime?
+  reviewedBy String?
+  actionTaken String?
+  resolutionNote String?
+  reporter   User     @relation("reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  reported   User     @relation("reported", fields: [reportedId], references: [id], onDelete: Cascade)
+
+  @@index([reporterId])
+  @@index([reportedId])
+  @@index([status])
+}
+
+model DailyUsage {
+  id             String   @id @default(cuid())
+  userId         String
+  date           String   // YYYY-MM-DD
+  profilesViewed Int      @default(0)
+  likes          Int      @default(0)
+  passes         Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId, date])
+}
+
+model PromptAnswer {
+  id        String             @id @default(cuid())
+  userId    String
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question  String
+  answer    String
+  status    PromptAnswerStatus @default(APPROVED)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+model DailyQuestion {
+  id        String   @id @default(cuid())
+  date      String   @unique
+  question  String
+  createdBy String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model DailyAnswer {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date      String
+  answer    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, date])
+  @@index([date])
+}
+
+// New models
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  targetId  String
+  createdAt DateTime @default(now())
+  user      User     @relation("favoriter", fields: [userId], references: [id], onDelete: Cascade)
+  target    User     @relation("favorited", fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, targetId])
+  @@index([userId])
+  @@index([targetId])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String?
+  link      String?
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
+}
+
+model AdminAction {
+  id        String   @id @default(cuid())
+  adminId   String
+  targetId  String?
+  action    String   // SUSPEND, ACTIVATE, DELETE, VERIFY, REJECT_VERIFY, RESOLVE_REPORT, etc
+  reason    String?
+  metadata  String?  // JSON
+  createdAt DateTime @default(now())
+  admin     User     @relation("adminActor", fields: [adminId], references: [id], onDelete: Cascade)
+  target    User?    @relation("adminTarget", fields: [targetId], references: [id], onDelete: SetNull)
+
+  @@index([adminId])
+  @@index([targetId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+model SystemConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+}
+
+model Announcement {
+  id        String   @id @default(cuid())
+  title     String
+  body      String
+  isActive  Boolean  @default(true)
+  createdBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+}
+
+model VerificationRequest {
+  id        String   @id @default(cuid())
+  userId    String
+  photoUrl  String
+  status    VerificationRequestStatus @default(PENDING)
+  note      String?
+  reviewedBy String?
+  createdAt DateTime @default(now())
+  reviewedAt DateTime?
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+}
+
+// Round 3 — shared rate-limit storage backend (RATE_LIMIT_BACKEND=prisma).
+// Giữ nguyên 1:1 so với schema sqlite — không cần biến thể riêng cho Postgres.
+model RateLimitBucket {
+  key         String   @id
+  windowStart DateTime
+  count       Int      @default(0)
+  expiresAt   DateTime
+
+  @@index([expiresAt])
+}

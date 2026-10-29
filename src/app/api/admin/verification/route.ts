@@ -9,7 +9,9 @@ export async function GET(req: Request) {
   const me = await prisma.user.findUnique({ where: { id: userId } });
   if (!me?.isAdmin) return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
   const { searchParams } = new URL(req.url);
-  const status = searchParams.get("status") ?? "PENDING";
+  // allowlist status — chặn giá trị lạ đi thẳng vào Prisma where (500 trên Postgres enum)
+  const raw = searchParams.get("status");
+  const status = raw === "APPROVED" || raw === "REJECTED" ? raw : "PENDING";
   const requests = await prisma.verificationRequest.findMany({ where: { status }, orderBy: { createdAt: "desc" }, take: 50, include: { user: { include: { profile: true } } } });
   return NextResponse.json({ requests });
 }

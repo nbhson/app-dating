@@ -3,13 +3,13 @@ import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
-const firstNames = [
+const firstNames: [name: string, gender: "MAN" | "WOMAN"][] = [
   ["Emma", "WOMAN"], ["Liam", "MAN"], ["Olivia", "WOMAN"], ["Noah", "MAN"], ["Ava", "WOMAN"],
   ["Minh", "MAN"], ["Linh", "WOMAN"], ["Hana", "WOMAN"], ["Ken", "MAN"], ["Sofia", "WOMAN"],
   ["James", "MAN"], ["Isabella", "WOMAN"], ["Lucas", "MAN"], ["Mia", "WOMAN"], ["Ethan", "MAN"],
   ["Amara", "WOMAN"], ["Daniel", "MAN"], ["Chloe", "WOMAN"], ["Harper", "WOMAN"], ["Aria", "WOMAN"],
   ["Leo", "MAN"], ["Nora", "WOMAN"], ["Akira", "MAN"], ["Yuki", "WOMAN"], ["Zane", "MAN"],
-  ["Elio", "MAN"], ["Maya", "WOMAN"], ["Alex", "NON_BINARY"], ["Jordan", "NON_BINARY"], ["Casey", "NON_BINARY"],
+  ["Elio", "MAN"], ["Maya", "WOMAN"], ["Alex", "MAN"], ["Jordan", "WOMAN"], ["Casey", "WOMAN"],
   ["Riley", "WOMAN"], ["Ava2", "WOMAN"], ["Ben", "MAN"], ["Tom", "MAN"], ["Sara", "WOMAN"],
 ];
 
@@ -28,7 +28,7 @@ const interestsPool = ["Coffee","Travel","Music","Hiking","Yoga","Books","Movies
 const locations = ["Quận 1, Sài Gòn","Thảo Điền","Đà Nẵng","Hà Nội","Bangkok","Singapore"];
 const occupations = ["Designer","Engineer","Marketing","Teacher","Photographer","Founder","Doctor","Artist"];
 const educations = ["RMIT","HCMUS","FTU","NTU","Chulalongkorn","Self-taught"];
-const intents = ["LONG_TERM","EXPLORING","FRIENDSHIP","UNSURE","SHORT_TERM"];
+const intents = ["LONG_TERM", "EXPLORING", "FRIENDSHIP", "UNSURE", "SHORT_TERM"] as const; // literal union khớp cả Intent enum (Postgres) lẫn String (sqlite)
 const promptQs = [
   "Điều khiến mình tò mò gần đây",
   "Một ngày Chủ Nhật hoàn hảo",
@@ -45,7 +45,7 @@ const promptAs = [
   "Mình thích đi bộ đường dài và mang theo máy film cũ.",
 ];
 
-function random<T>(arr: T[]) { return arr[Math.floor(Math.random()*arr.length)]; }
+function random<T>(arr: readonly T[]) { return arr[Math.floor(Math.random()*arr.length)]; }
 function randomAge() { return 22 + Math.floor(Math.random()*12); }
 
 const ADMIN_EMAIL = "nbhson43@gmail.com";
@@ -113,7 +113,7 @@ async function main() {
         userId: user.id,
         firstName: name,
         dob,
-        gender: gender as string,
+        gender: gender, // typed as "MAN"|"WOMAN" — assignable to Gender enum (PG) and String field (sqlite)
         location: random(locations),
         bio: random(bios),
         occupation: random(occupations),
