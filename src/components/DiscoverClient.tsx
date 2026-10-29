@@ -302,12 +302,6 @@ export default function DiscoverClient() {
               <input type="range" min={5} max={200} step={5} value={filters.maxDistance} onChange={(e) => setFilters({ ...filters, maxDistance: Number(e.target.value) })} aria-label={trans("profile.radius", { value: filters.maxDistance })} className="w-full accent-[#FF4D6D]" />
             </label>
             <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => applyFilters({ verifiedOnly: false, hasVoiceOnly: false, hasPhotoOnly: false, maxDistance: 200 })}
-                className="h-9 px-4 rounded-full bg-white border border-[#FCE8EC] text-xs font-semibold hover:bg-[#FFF0F3] transition"
-              >
-                {t.discover.expandRadius}
-              </button>
               <button onClick={() => applyFilters(filters)} className="h-9 px-5 rounded-full btn-primary text-xs font-semibold">
                 {t.discover.applyFilters}
               </button>

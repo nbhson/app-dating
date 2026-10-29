@@ -5,7 +5,6 @@ import { useI18n } from "@/lib/i18n/context";
 import { usePopup } from "@/components/ui/PopupProvider";
 import { REPORT_REASONS } from "@/lib/domain";
 
-
 export default function ChatClient({ matchId }: { matchId: string }) {
   const { t, trans } = useI18n();
   const { toast, confirm } = usePopup();

@@ -25,7 +25,14 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
   return NextResponse.json({
     user,
-    completeness: computeProfileCompleteness(user as never),
+    completeness: computeProfileCompleteness({
+      profile: user.profile,
+      photos: user.photos,
+      promptAnswers: user.promptAnswers,
+      height: user.height,
+      languages: user.languages ?? null,
+      religion: user.religion ?? null,
+    }),
   });
 }
 

@@ -163,7 +163,7 @@ export default function ProfileClient({ user }: { user: any }) {
               </div>
             )}
             {completeness.missing.length === 0 && (
-              <div className="text-xs font-semibold text-emerald-600 mt-2">✓ {(t.profile as any).verificationStatusVerified}</div>
+              <div className="text-xs font-semibold text-emerald-600 mt-2">✓ {t.profile.completenessDone}</div>
             )}
           </div>
         </div>
