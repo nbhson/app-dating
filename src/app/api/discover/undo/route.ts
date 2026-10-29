@@ -20,9 +20,10 @@ export async function POST() {
 
   await prisma.pass.delete({ where: { id: lastPass.id } });
   const date = todayKey();
+  // Round 2 (R2-6): chỉ decrement khi passes > 0 — trước đây undo lặp là số âm.
   await prisma.dailyUsage.updateMany({
-    where: { userId, date },
-    data: { passes: { decrement: 1 } as any },
+    where: { userId, date, passes: { gt: 0 } },
+    data: { passes: { decrement: 1 } },
   });
 
   return NextResponse.json({ status: "UNDONE", undoneUserId: lastPass.toUserId });

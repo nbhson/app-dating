@@ -14,7 +14,20 @@ export async function POST(req: Request) {
   if (file.size > 3 * 1024 * 1024) return NextResponse.json({ error: "TOO_LARGE" }, { status: 400 });
   const duration = Number(form.get("duration") ?? 15);
   const bytes = Buffer.from(await file.arrayBuffer());
-  const ext = file.type.includes("webm") ? "webm" : file.type.includes("mp4") ? "m4a" : "webm";
+  // Round 2 (R2-7): allowlist audio MIME → ext. Trước đây `includes("mp4")`
+  // nhận cả video/mp4 và MIME lạ; extension luôn suy từ MIME, không từ tên file.
+  const EXT_BY_AUDIO_MIME: Record<string, string> = {
+    "audio/webm": "webm",
+    "video/webm": "webm", // MediaRecorder một số browser vẫn set video/webm cho audio-only stream
+    "audio/mp4": "m4a",
+    "audio/mpeg": "mp3",
+    "audio/ogg": "ogg",
+    "audio/wav": "wav",
+    "audio/x-wav": "wav",
+    "audio/aac": "aac",
+  };
+  const ext = EXT_BY_AUDIO_MIME[file.type];
+  if (!ext) return NextResponse.json({ error: "INVALID_TYPE" }, { status: 400 });
   const dir = path.join(process.cwd(), "public", "uploads", "voices");
   await mkdir(dir, { recursive: true });
   const name = `${userId}-${Date.now()}.${ext}`;

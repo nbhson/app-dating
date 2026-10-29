@@ -18,10 +18,19 @@ export async function GET() {
     },
   });
 
+  // Round 2 (R2-5): unread đếm 1 lần bằng groupBy — trước đây 1 query cho mỗi
+  // match (N+1), inbox nhiều match thì chậm tuyến tính.
+  const matchIds = matches.map((m) => m.id);
+  const unreadRows = await prisma.message.groupBy({
+    by: ["matchId"],
+    where: { matchId: { in: matchIds }, senderId: { not: userId }, read: false },
+    _count: { matchId: true },
+  });
+  const unreadByMatch = new Map(unreadRows.map((r) => [r.matchId, r._count.matchId]));
+
   const data = await Promise.all(
     matches.map(async (m) => {
       const other = m.userAId === userId ? m.userB : m.userA;
-      const unread = await prisma.message.count({ where: { matchId: m.id, senderId: { not: userId }, read: false } });
       return {
         id: m.id,
         createdAt: m.createdAt,
@@ -34,7 +43,7 @@ export async function GET() {
         },
         lastMessage: m.messages[0]?.content ?? null,
         lastMessageAt: m.messages[0]?.createdAt ?? m.createdAt,
-        unread,
+        unread: unreadByMatch.get(m.id) ?? 0,
         type: "match" as const,
       };
     })
