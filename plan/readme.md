@@ -63,7 +63,39 @@ Objective: nâng thêm một tầm chất lượng nữa — xử lý follow-up 
 ### Không làm (ghi nhận)
 
 - **Dark mode**: design system hiện là warm-light "paper" với hàng trăm hex hardcode trong component; override token-level chỉ phủ ~1/3 surface → dark mode nửa vời tệ hơn không có. Follow-up: chuyển toàn bộ hex sang CSS var trước.
-- **Rate limit shared store / email verification** — giữ nguyên như Round 1 (cần infra).
+- ~~Rate limit shared store~~ — đã làm ở Round 3 (xem dưới). **Email verification** — vẫn giữ nguyên (cần provider mail infra).
+
+## Round 3 (2026-10-29) — rate-limit shared infra + Postgres migration prep
+
+### 1. Rate-limit storage-abstracted layer (`lib/ratelimit.ts`)
+
+- `RateLimitStore` interface (`consume/reset`), 2 backend:
+  - **memory** (mặc định) — fixed window, giữ nguyên semantics của auth.ts từ R1.
+  - **prisma** — bảng mới `RateLimitBucket` (key PK, windowStart, count, expiresAt, index expiresAt), race-safe: updateMany-reset-expired → updateMany-increment → create-with-catch-retry.
+- Chọn backend qua `RATE_LIMIT_BACKEND=memory|prisma` (default memory). `auth.ts` login limiting (15 phút / 10 lần / per email, reset khi thành công) chuyển sang dùng layer chung — semantics không đổi.
+- **Verify**: `prisma validate` + `db push` sqlite ✓ (bảng tạo trong dev.db); unit test isolate sqlite file tạm (`tests/ratelimit.test.ts`, DDL đúng như db push sinh); smoke trên dev.db thật (allow/allow/deny, reset OK); smoke trên **Postgres 16 thật** cũng OK (`scripts/rl-smoke-pg.ts`).
+- Lỗi tự sửa khi code: bản đầu updateMany-reset + updateMany-increment chạy tuần tự gây double-count hit đầu tiên trong window mới → restructure: nếu reset match (count>0) thì bỏ qua increment.
+
+### 2. Postgres migration prep (không đổi dev sqlite)
+
+- `prisma/schema.postgres.prisma`: provider postgresql + 12 native enum (UserStatus, Gender, InterestedIn, Intent, HabitLevel, PhotoStatus, MatchStatus, ReportStatus, PromptAnswerStatus, VerificationRequestStatus, NotificationType, VerificationStatus) khớp 1:1 domain.ts + status code thật sự ghi. `Report.reason` giữ String + CHECK (Prisma 5 DSL không hỗ trợ enum value có dấu cách).
+- `prisma/postgres/0001_check_constraints.sql`: 19 CHECK (lat/lng range, age gate 18+, minAge≤maxAge, position 0–5, counts ≥0, stamps ≥0, height 100–250, maxDistance 1–500, no self-like/pass/block/favorite/match/report, report reason allowlist). **Đã test trên Postgres 16 thật** (initdb throwaway trong tmp): apply sạch + mọi violation bị chặn đúng tên constraint; native enum chặn `smoking='SOMETIMES'`.
+- `plan/postgres-migration.md`: hướng dẫn từng bước + caveats (client generation gắn provider, NON_BINARY data remap, thêm enum value phải sửa cả 2 nơi).
+- **Phát hiện quan trọng nhờ verify trên PG thật**: generate client từ PG schema rồi chạy `tsc --noEmit` toàn app → 4 lỗi type (seed.ts ×3, admin/verification ×1) đã sửa để code tương thích **cả hai** client; client hiện đã được regenerate về sqlite.
+
+### Light-touch fixes kèm theo
+
+- `api/admin/verification` GET: `status` query param không validate đi thẳng vào Prisma where → allowlist PENDING/APPROVED/REJECTED (với PG enum client, giá trị lạ là 500).
+- Seed: `NON_BINARY` gender (API/domain không nhận) → MAN/WOMAN + remap 3 row cũ trong dev.db; `random<T>(arr: T[])` → `readonly T[]`; typed `firstNames` tuples.
+
+### Trạng thái Round 3
+
+- [x] Rate-limit layer storage-abstracted (memory mặc định + Prisma backend qua env) + 10 test mới (27/27)
+- [x] Prisma backend smoke trên sqlite dev.db VÀ Postgres 16 thật
+- [x] Postgres migration prep: schema.postgres.prisma + CHECK SQL + plan/postgres-migration.md
+- [x] Verified cả 2 generated client bằng tsc; build ✓; test ✓
+- [x] Commit conventional, local only (không push)
+- [ ] Còn lại: ETL data sqlite→PG (chưa làm, chỉ doc), email verification (cần infra), Redis nếu cần multi-region latency
 
 ### Trạng thái Round 2
 
