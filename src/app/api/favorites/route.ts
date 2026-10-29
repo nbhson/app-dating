@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { requireUserId } from "@/lib/api";
 import { getAge } from "@/lib/utils";
 
 export async function GET() {
-  const session = await auth();
-  const userId = (session?.user as any)?.id as string | undefined;
+  const userId = await requireUserId();
   if (!userId) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
 
   const favs = await prisma.favorite.findMany({
@@ -30,11 +29,16 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const session = await auth();
-  const userId = (session?.user as any)?.id as string | undefined;
+  const userId = await requireUserId();
   if (!userId) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
-  const { targetId } = await req.json();
+  const { targetId } = await req.json().catch(() => null) ?? {};
   if (!targetId || targetId === userId) return NextResponse.json({ error: "INVALID_TARGET" }, { status: 400 });
+
+  // Validate target (id rác → FK violation 500 trước đây).
+  const target = await prisma.user.findUnique({ where: { id: targetId }, select: { status: true } });
+  if (!target || target.status !== "ACTIVE") {
+    return NextResponse.json({ error: "TARGET_NOT_AVAILABLE" }, { status: 404 });
+  }
 
   const exists = await prisma.favorite.findUnique({ where: { userId_targetId: { userId, targetId } } });
   if (exists) return NextResponse.json({ status: "ALREADY_FAVORITED", favorite: exists });
@@ -44,8 +48,7 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const session = await auth();
-  const userId = (session?.user as any)?.id as string | undefined;
+  const userId = await requireUserId();
   if (!userId) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   const { searchParams } = new URL(req.url);
   const targetId = searchParams.get("targetId");

@@ -1,14 +1,20 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { requireUserId } from "@/lib/api";
 import { todayKey } from "@/lib/utils";
 
 export async function POST(req: Request) {
-  const session = await auth();
-  const userId = (session?.user as any)?.id as string | undefined;
+  const userId = await requireUserId();
   if (!userId) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
-  const { toUserId } = await req.json();
+  const { toUserId } = await req.json().catch(() => null) ?? {};
   if (!toUserId || toUserId === userId) return NextResponse.json({ error: "INVALID_TARGET" }, { status: 400 });
+
+  // Validate target (id rác → FK violation 500 trước đây).
+  const target = await prisma.user.findUnique({ where: { id: toUserId }, select: { status: true } });
+  if (!target || target.status !== "ACTIVE") {
+    return NextResponse.json({ error: "TARGET_NOT_AVAILABLE" }, { status: 404 });
+  }
+
 
   const existingPass = await prisma.pass.findUnique({ where: { fromUserId_toUserId: { fromUserId: userId, toUserId } } });
   if (existingPass) return NextResponse.json({ status: "ALREADY_PASSED" });
