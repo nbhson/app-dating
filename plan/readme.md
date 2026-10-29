@@ -28,7 +28,44 @@
 - **Auto-registration chưa verify email** (auth.ts:88): cần flow gửi mail (provider config), không thể fix thuần code trong đợt này — follow-up.
 - **`user.status` check thiếu ở nhiều route** (suspended vẫn like/message): cần middleware dùng chung — thay đổi lớn, đánh dấu follow-up; auth.ts đã chặn login của suspended.
 
-## Trạng thái
+## Round 2 (2026-10-29) — enterprise upgrade
+
+Objective: nâng thêm một tầm chất lượng nữa — xử lý follow-up Prisma từ đợt 1, vá các lỗ hổng còn sót, chuẩn hoá validation về một nơi duy nhất, thêm feature đúng domain dating, và siết a11y/UI.
+
+### Kết quả deep-review (đợt 2)
+
+| # | Severity | Vị trí | Vấn đề | Fix |
+|---|----------|--------|--------|-----|
+| R2-1 | CRITICAL (bug) | ProfileClient.tsx:260 | Gửi xác minh từ trang Profile gửi `photoUrl: URL.createObjectURL(file)` qua JSON → API yêu cầu `/uploads/verification/` → **luôn 400 MISSING_PHOTO. Flow self-verification hỏng hoàn toàn từ UI** | Gửi multipart FormData (API đã hỗ trợ sẵn đường multipart) |
+| R2-2 | MAJOR | api/discover/pass, api/favorites POST, api/users/[id]/block, api/users/[id]/report | Target id không được validate → id rác đi thẳng xuống Prisma → FK violation 500 (cùng lớp bug Round-1 #6, chỉ fix trong like) | Validate target tồn tại + ACTIVE ở cả 4 route |
+| R2-3 | MAJOR | api/profile/me PATCH | `latitude/longitude/height` chỉ `Number()` — NaN/range tùy ý vào DB; `gender/interestedIn/intent/smoking/drinking` là chuỗi bất kỳ (db bị nhồi giá trị lạ làm hỏng filter) | Validate range (lat ±90, lng ±180, height 100–250) + enum allowlist |
+| R2-4 | MAJOR | 3 nơi | `REPORT_REASONS` copy-paste ở api/report, DiscoverClient, ChatClient → lệch nhau là bypass validate | Gom vào `lib/domain.ts` (single source) |
+| R2-4b | MAJOR | api/discover/like | dailyUsage increment + like.create + stamps decrement chạy riêng lẻ → concurrent requests vượt like-cap, trừ stamps lệch | `$transaction` interactive |
+| R2-5 | MINOR | api/matches | N+1: `message.count` trong vòng lặp cho từng match | `message.groupBy` 1 query |
+| R2-6 | MINOR | api/discover/undo | decrement `passes` không floor → số âm nếu bấm undo nhiều lần | `updateMany` với `passes > 0` |
+| R2-7 | MINOR | api/profile/voice | `file.type.includes("webm"/"mp4")` → nhận cả `video/mp4`, MIME lạ | Allowlist audio MIME map → ext |
+| R2-8 | MINOR | Nav.tsx:155 | Thanh tiến trình ngày hiển thị dữ liệu cứng `13/20` (fake) | Lấy thật từ `/api/usage/today` |
+| R2-6 | MINOR | ProfileClient.save() | Luôn toast "Đã lưu" kể cả khi API trả 400 | Surface lỗi thật từ response |
+| R2-7 | MINOR | a11y | Nút icon-only không có accessible name (photo arrows, favorite heart, xóa ảnh) | `aria-label` |
+| R2-8 | INFO | prisma/prisma/dev.db | DB artifact lồng 2 cấp (do chạy CLI với cwd sai) + `prisma/dev.db` thật bị thiếu → app tạo DB rỗng mới | Move db về `prisma/dev.db`, xoá dir lồng, gitignore chặn |
+
+### Follow-up đợt 1: VerificationToken @id + enum/CHECK — KẾT QUẢ DEEP VERIFY
+
+- **@id**: schema cũ (chỉ `@@unique([identifier, token])`) đúng theo docs của `@auth/prisma-adapter` và `prisma validate` pass — audit đánh CRITICAL là quá mức. Tuy nhiên đã **fix chủ động** sang `@@id([identifier, token])`: primary key tường minh, vẫn giữ compound key `identifier_token` mà adapter dùng. Đã chứng minh: `prisma validate` ✓, `prisma db push` sync OK trên db có data (36 users, không mất gì), `prisma generate` OK.
+- **Enum/CHECK native: KHÔNG THÊM ĐƯỢC trên sqlite** — Prisma trả `P1012: You defined the enum ... But the current connector does not support enums` (đã test riêng). CHECK constraint cũng không có cú pháp trong Prisma DSL 5.x. → Chọn giải pháp **app-layer enum**: `src/lib/domain.ts` định nghĩa các enum hợp lệ (gender, intent, interestedIn, smoking/drinking, report reasons, statuses…) và mọi API route validate qua đó. Migration sang Postgres (nơi có enum + CHECK thật) ghi là follow-up hạ tầng.
+
+### Features mới (Round 2)
+
+1. **Profile completeness** — `lib/completeness.ts` tính % hoàn thiện hồ sơ + danh sách mục còn thiếu; trả về trong `GET /api/profile/me`; UI: thanh completeness ở Profile page + chip gợi ý nhảy tới đúng section.
+2. **Discover quick filters** — filter sheet ngay trên Discover (verified-only / has-voice / has-photo / maxDistance), persist qua `PATCH /api/profile/me` (dùng lại field `Preference` có sẵn), áp dụng ngay cho profile tiếp theo.
+3. **Stamps balance trong composer** — `/api/usage/today` trả thêm `stamps`; DiscoverClient hiện chip số tem còn lại, khoá checkbox ưu tiên khi hết (trước đây gửi mới biết `NO_STAMPS`).
+
+### Không làm (ghi nhận)
+
+- **Dark mode**: design system hiện là warm-light "paper" với hàng trăm hex hardcode trong component; override token-level chỉ phủ ~1/3 surface → dark mode nửa vời tệ hơn không có. Follow-up: chuyển toàn bộ hex sang CSS var trước.
+- **Rate limit shared store / email verification** — giữ nguyên như Round 1 (cần infra).
+
+## Trạng thái Round 1
 
 - [x] Plan
 - [x] Fix #1–#13

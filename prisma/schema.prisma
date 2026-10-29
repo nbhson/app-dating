@@ -96,7 +96,13 @@ model VerificationToken {
   token      String   @unique
   expires    DateTime
 
-  @@unique([identifier, token])
+  // Round 2 (audit follow-up): composite PRIMARY KEY thay vì chỉ @@unique.
+  // @auth/prisma-adapter truy cập model này qua compound key `identifier_token`
+  // (useVerificationToken / deleteVerificationToken) — `@@id` giữ nguyên key đó
+  // trong PrismaClient trong khi cho model một primary key tường minh, đồng bộ
+  // với mọi model khác trong schema. App không dùng email provider nên bảng
+  // này hiện không được ghi vào runtime; `prisma db push` rebuild an toàn.
+  @@id([identifier, token])
 }
 
 model Profile {
