@@ -65,6 +65,16 @@ Objective: nâng thêm một tầm chất lượng nữa — xử lý follow-up 
 - **Dark mode**: design system hiện là warm-light "paper" với hàng trăm hex hardcode trong component; override token-level chỉ phủ ~1/3 surface → dark mode nửa vời tệ hơn không có. Follow-up: chuyển toàn bộ hex sang CSS var trước.
 - **Rate limit shared store / email verification** — giữ nguyên như Round 1 (cần infra).
 
+### Trạng thái Round 2
+
+- [x] Deep review (src, prisma, tests)
+- [x] Plan + findings table (mục trên)
+- [x] Prisma follow-up: VerificationToken `@@id` + app-layer enum (`lib/domain.ts`)
+- [x] Fix R2-1…R2-8
+- [x] Features: completeness / quick filters / stamps
+- [x] `tsc --noEmit` sạch · `npm run build` ✓ · `npm test` 17/17 ✓ · `prisma validate` + `db push` ✓ · smoke test dev server (200/401/redirect đúng)
+- [x] Commit nhỏ theo conventional commits + self-review diff (1 commit fix theo self-review)
+
 ## Trạng thái Round 1
 
 - [x] Plan
@@ -73,6 +83,10 @@ Objective: nâng thêm một tầm chất lượng nữa — xử lý follow-up 
 - [x] Commit + self-review
 
 ## Review Log
+
+### Round 2
+- Self-review diff sau commit: phát hiện (1) `computeProfileCompleteness(user as never)` cast lười → thay bằng object tường minh; (2) trạng thái "hoàn thiện" ở Profile tái dùng nhầm nhãn "Đã xác minh" → thêm key `completenessDone`; (3) nút reset filter dùng nhầm label "+20 km bán kính" (gây hiểu lầm) → bỏ; (4) edit đầu tiên làm rơi phần cuối của useEffect trong DiscoverClient + tạo `}` thừa trong profile/me — phát hiện nhờ `tsc` và sửa ngay. Sau self-review: tsc/build/test lại sạch, 1 commit `refactor:` bổ sung (aa55064).
+- Smoke test runtime: `GET /` 200, `GET /discover` 307 (redirect về / khi chưa login — behavior có sẵn), `GET /api/usage/today` + `POST /api/users/:id/report` không session → 401 đúng.
 
 ### Vòng 1
 - Self-review: `tsc --noEmit` sạch. Lỗi tự phát hiện trong bản fix: (1) edit đầu tiên dùng nhầm `asBoundedString` chưa định nghĩa + gọi `boundedLocation()` như hàm + làm mất dòng latitude/longitude/interests — viết lại toàn block; (2) lần đầu ghi `AdminAction` sai field name so với schema (dùng `targetUserId`/`details` thay `targetId`/`reason`) — đã đối chiếu `prisma/schema.prisma:335` và sửa. Kiểm tra `ProfileClient`/`OnboardingClient` không còn gửi `voiceUrl` vào PATCH.
