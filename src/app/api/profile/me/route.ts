@@ -1,25 +1,39 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { requireUserId } from "@/lib/api";
+import { computeProfileCompleteness } from "@/lib/completeness";
+import {
+  GENDERS,
+  INTERESTED_IN,
+  INTENTS,
+  HABIT_LEVELS,
+  isAllowed,
+  bounded,
+  boundedNullable,
+  finiteInRange,
+  LATITUDE_MIN, LATITUDE_MAX, LONGITUDE_MIN, LONGITUDE_MAX, HEIGHT_MIN, HEIGHT_MAX,
+} from "@/lib/domain";
 import { getAge } from "@/lib/utils";
 
 export async function GET() {
-  const session = await auth();
-  const userId = (session?.user as any)?.id as string | undefined;
+  const userId = await requireUserId();
   if (!userId) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: { profile: true, photos: { orderBy: { position: "asc" } }, preferences: true, promptAnswers: true },
   });
   if (!user) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
-  return NextResponse.json({ user });
+  return NextResponse.json({
+    user,
+    completeness: computeProfileCompleteness(user as never),
+  });
 }
 
 export async function PATCH(req: Request) {
-  const session = await auth();
-  const userId = (session?.user as any)?.id as string | undefined;
+  const userId = await requireUserId();
   if (!userId) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
-  const body = await req.json();
+  const body = await req.json().catch(() => null);
+  if (!body || typeof body !== "object") return NextResponse.json({ error: "INVALID_BODY" }, { status: 400 });
   const { firstName, dob, gender, location, latitude, longitude, bio, occupation, education, interests, preferences, promptAnswers, voiceDuration, isIncognito, height, languages, religion, wantKids, smoking, drinking } = body;
   // voiceUrl đã bị loại khỏi PATCH: trước đây client tự truyền chuỗi bất kỳ →
   // lưu verbatim rồi render `<a href>` + `<audio src>` → `javascript:` URL
@@ -30,8 +44,7 @@ export async function PATCH(req: Request) {
 
   if (interests && !Array.isArray(interests)) return NextResponse.json({ error: "INVALID_INTERESTS" }, { status: 400 });
   // Validate dạng + độ dài trước khi ghi DB (trước đây unbounded).
-  const asBounded = (v: unknown, max: number): string | undefined =>
-    typeof v === "string" ? v.slice(0, max) : undefined;
+  const asBounded = (v: unknown, max: number): string | undefined => bounded(v, max);
   const boundedFirstName = firstName !== undefined ? asBounded(firstName, 30) : undefined;
   const boundedBio = bio !== undefined ? asBounded(bio, 500) : undefined;
   const boundedOccupation = occupation !== undefined ? asBounded(occupation, 100) : undefined;
@@ -39,6 +52,41 @@ export async function PATCH(req: Request) {
   const boundedLocation = location !== undefined ? asBounded(location, 200) : undefined;
   if (firstName !== undefined && !boundedFirstName) {
     return NextResponse.json({ error: "INVALID_FIRST_NAME" }, { status: 400 });
+  }
+  // Gender là enum domain — không nhận chuỗi tự chế (hỏng filter discovery).
+  if (gender !== undefined && !isAllowed(gender, GENDERS)) {
+    return NextResponse.json({ error: "INVALID_GENDER" }, { status: 400 });
+  }
+  // Tọa độ: phải là số trong range hợp lệ — trước đây chỉ Number(), NaN làm
+  // Prisma 500, còn lat=999 được ghi vào DB làm hỏng khoảng cách.
+  if (latitude !== undefined && latitude !== null) {
+    if (finiteInRange(latitude, LATITUDE_MIN, LATITUDE_MAX) === null) {
+      return NextResponse.json({ error: "INVALID_COORDINATES" }, { status: 400 });
+    }
+  }
+  if (longitude !== undefined && longitude !== null) {
+    if (finiteInRange(longitude, LONGITUDE_MIN, LONGITUDE_MAX) === null) {
+      return NextResponse.json({ error: "INVALID_COORDINATES" }, { status: 400 });
+    }
+  }
+  // Chiều cao (cm): 100–250 hoặc null.
+  if (height !== undefined && height !== null && finiteInRange(height, HEIGHT_MIN, HEIGHT_MAX) === null) {
+    return NextResponse.json({ error: "INVALID_HEIGHT" }, { status: 400 });
+  }
+  // Ngôn ngữ: mảng chuỗi ngắn, tối đa 10 mục (trước đây chuỗi bất kỳ).
+  if (languages !== undefined) {
+    if (languages === null) {
+      // cho phép xoá
+    } else if (!Array.isArray(languages) || languages.some((l: unknown) => typeof l !== "string") || languages.length > 10) {
+      return NextResponse.json({ error: "INVALID_LANGUAGES" }, { status: 400 });
+    }
+  }
+  // Thói quen: rỗng hoặc allowlist (trước đây chuỗi bất kỳ từ client select).
+  if (smoking !== undefined && smoking !== null && smoking !== "" && !isAllowed(smoking, HABIT_LEVELS)) {
+    return NextResponse.json({ error: "INVALID_SMOKING" }, { status: 400 });
+  }
+  if (drinking !== undefined && drinking !== null && drinking !== "" && !isAllowed(drinking, HABIT_LEVELS)) {
+    return NextResponse.json({ error: "INVALID_DRINKING" }, { status: 400 });
   }
   // Dob: phải là date hợp lệ + đủ 18+ (dating app — age gate bắt buộc).
   if (dob !== undefined) {
@@ -102,6 +150,19 @@ export async function PATCH(req: Request) {
   }
 
   if (preferences) {
+    // Allowlist + range cho preference — trước đây interestedIn/intent nhận
+    // chuỗi bất kỳ làm hỏng filter, maxDistance nhận float/giá trị âm.
+    if (preferences.interestedIn !== undefined && !isAllowed(preferences.interestedIn, INTERESTED_IN)) {
+      return NextResponse.json({ error: "INVALID_PREFERENCE" }, { status: 400 });
+    }
+    if (preferences.intent !== undefined && !isAllowed(preferences.intent, INTENTS)) {
+      return NextResponse.json({ error: "INVALID_INTENT" }, { status: 400 });
+    }
+    if (preferences.maxDistance !== undefined && preferences.maxDistance !== null) {
+      if (!Number.isInteger(Number(preferences.maxDistance)) || Number(preferences.maxDistance) < 1 || Number(preferences.maxDistance) > 500) {
+        return NextResponse.json({ error: "INVALID_MAX_DISTANCE" }, { status: 400 });
+      }
+    }
     const prefData: any = {};
     if (preferences.interestedIn) prefData.interestedIn = preferences.interestedIn;
     if (preferences.minAge !== undefined) prefData.minAge = preferences.minAge;
@@ -123,14 +184,14 @@ export async function PATCH(req: Request) {
   if (isIncognito !== undefined) {
     await prisma.user.update({ where: { id: userId }, data: { isIncognito: !!isIncognito } });
   }
-  // extended profile fields on User
+  // extended profile fields on User — dùng giá trị đã validate ở trên
   const userExtra: any = {};
-  if (height !== undefined) userExtra.height = height ? Number(height) : null;
-  if (languages !== undefined) userExtra.languages = languages ? JSON.stringify(languages) : null;
-  if (religion !== undefined) userExtra.religion = religion || null;
-  if (wantKids !== undefined) userExtra.wantKids = wantKids || null;
-  if (smoking !== undefined) userExtra.smoking = smoking || null;
-  if (drinking !== undefined) userExtra.drinking = drinking || null;
+  if (height !== undefined) userExtra.height = height === null ? null : Number(height);
+  if (languages !== undefined) userExtra.languages = languages === null ? null : JSON.stringify(languages.map((l: string) => l.trim().slice(0, 30)));
+  if (religion !== undefined) userExtra.religion = boundedNullable(religion, 60);
+  if (wantKids !== undefined) userExtra.wantKids = boundedNullable(wantKids, 60);
+  if (smoking !== undefined) userExtra.smoking = smoking === "" ? null : smoking ?? null;
+  if (drinking !== undefined) userExtra.drinking = drinking === "" ? null : drinking ?? null;
   if (Object.keys(userExtra).length) {
     await prisma.user.update({ where: { id: userId }, data: userExtra });
   }
@@ -156,8 +217,7 @@ export async function PATCH(req: Request) {
 }
 
 export async function DELETE() {
-  const session = await auth();
-  const userId = (session?.user as any)?.id as string | undefined;
+  const userId = await requireUserId();
   if (!userId) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   const me = await prisma.user.findUnique({ where: { id: userId }, select: { isAdmin: true } });
   if (me?.isAdmin) return NextResponse.json({ error: "ADMIN_CANNOT_DELETE", message: "Admin không thể xóa tài khoản" }, { status: 403 });

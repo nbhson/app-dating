@@ -23,8 +23,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
 }
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth();
-  const userId = (session?.user as any)?.id as string | undefined;
+  const userId = await requireUserId();
   if (!userId) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   const { id } = await params;
   await prisma.block.deleteMany({ where: { blockerId: userId, blockedId: id } });

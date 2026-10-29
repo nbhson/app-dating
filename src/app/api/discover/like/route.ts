@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { requireUserId } from "@/lib/api";
 import { todayKey } from "@/lib/utils";
 import { DAILY_LIKE_LIMIT, likesToday } from "@/lib/daily";
 
 export async function POST(req: Request) {
-  const session = await auth();
-  const userId = (session?.user as any)?.id as string | undefined;
+  const userId = await requireUserId();
   if (!userId) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
-  const { toUserId, comment, anchor, isPriority } = await req.json();
+  const body = await req.json().catch(() => null) ?? {};
+  const { toUserId, comment, anchor, isPriority } = body;
   if (!toUserId || typeof toUserId !== "string" || toUserId === userId) {
     return NextResponse.json({ error: "INVALID_TARGET" }, { status: 400 });
   }
@@ -54,18 +54,23 @@ export async function POST(req: Request) {
   if (existingPass) await prisma.pass.delete({ where: { fromUserId_toUserId: { fromUserId: userId, toUserId } } });
 
   const date = todayKey();
-  await prisma.dailyUsage.upsert({
-    where: { userId_date: { userId, date } },
-    update: { likes: { increment: 1 } },
-    create: { userId, date, likes: 1 },
+  // Round 2 (R2-4b): 3 thao tác chạy trong MỘT transaction — trước đây chạy
+  // riêng lẻ nên concurrent requests vượt qua like-cap và trừ stamps lệch.
+  await prisma.$transaction(async (tx) => {
+    await tx.dailyUsage.upsert({
+      where: { userId_date: { userId, date } },
+      update: { likes: { increment: 1 } },
+      create: { userId, date, likes: 1 },
+    });
+
+    await tx.like.create({ data: { fromUserId: userId, toUserId, comment: comment.trim().slice(0, 140), promptId: anchor ? String(anchor).slice(0, 200) : null, isPriority: !!isPriority } });
+    if (isPriority) {
+      await tx.user.update({ where: { id: userId }, data: { stamps: { decrement: 1 } } });
+    }
   });
 
   const reciprocal = await prisma.like.findUnique({ where: { fromUserId_toUserId: { fromUserId: toUserId, toUserId: userId } } });
 
-  await prisma.like.create({ data: { fromUserId: userId, toUserId, comment: comment.trim().slice(0, 140), promptId: anchor ? String(anchor).slice(0, 200) : null, isPriority: !!isPriority } });
-  if (isPriority) {
-    await prisma.user.update({ where: { id: userId }, data: { stamps: { decrement: 1 } } });
-  }
   // notify recipient — link thẳng vào tab "Ai thích mình" để không bị lạc (bug fix)
   try {
     await prisma.notification.create({ data: { userId: toUserId, type: "LIKE", title: isPriority ? "Bưu thiếp ưu tiên! ✦" : "Bạn có bưu thiếp mới", body: comment.trim().slice(0, 80), link: "/matches?tab=liked" } });
