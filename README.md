@@ -1,5 +1,7 @@
 # Lumen — Letters, not swipes
 
+[![CI](https://github.com/nbhson/app-dating/actions/workflows/ci.yml/badge.svg)](https://github.com/nbhson/app-dating/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 > **20 bưu thiếp mỗi ngày. Đọc chậm, trả lời bằng một dòng thật lòng.**
 
 Dating tối giản, intentional, khác biệt hoàn toàn với Tinder/Bumble: không swipe, không thả tim trống. Mỗi profile là một **bưu thiếp giấy** — ảnh mờ phải mở, lời tự sự, voice 15s, và câu hỏi chung của ngày. Muốn “thích”, bạn phải viết 6–140 ký tự và chọn một chi tiết để làm chủ đề.
