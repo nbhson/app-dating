@@ -260,16 +260,16 @@ VerificationRequest { userId, photoUrl, status(PENDING|APPROVED|REJECTED), note,
 ## Quick Start
 
 ```bash
-npm install
+pnpm install
 cp .env.example .env  # điền DATABASE_URL, AUTH_SECRET, GOOGLE_*, APPLE_*
 npx prisma db push
-npx tsx prisma/seed.ts
-npm run dev  # http://localhost:3000
+npx tsx prisma/seed.ts  # in mật khẩu admin random ra console — ghi lại ngay (chỉ hiện 1 lần)
+pnpm run dev  # http://localhost:3000
 ```
 
 **Demo không OAuth:** Nhập bất kỳ email ở landing (vd `demo1@lumen.app` khi SEED_DEMO=1).
 
-**Admin:** `nbhson` (`nbhson43@gmail.com`) / `Lumen123!`. Seed tự tạo/nâng quyền `nbhson43@gmail.com` làm admin (name=`nbhson`) và hạ quyền email cũ `admin@admin.admin`. `ADMIN_EMAIL` được định nghĩa tại `src/lib/auth.ts:9` và `prisma/seed.ts:51`. Muốn đặt admin khác: `npx prisma studio` hoặc `UPDATE User SET isAdmin=1 WHERE email='you@...';`
+**Admin:** `nbhson` (`nbhson43@gmail.com`) — **không có mật khẩu cố định trong repo.** Seed tự tạo/nâng quyền `nbhson43@gmail.com` làm admin (name=`nbhson`) với **mật khẩu random** (`crypto.randomBytes`) và in ra console **đúng một lần** lúc seed kèm cảnh báo đổi ngay. Lỡ mất mật khẩu: xoá user admin (`npx prisma studio` → User → Delete) rồi chạy lại `npx tsx prisma/seed.ts` để nhận mật khẩu random mới. `ADMIN_EMAIL` được định nghĩa tại `src/lib/auth.ts:9` và `prisma/seed.ts:53`. Muốn đặt admin khác: `npx prisma studio` hoặc `UPDATE User SET isAdmin=1 WHERE email='you@...';`
 
 ### Env
 

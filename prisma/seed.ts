@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import crypto from "node:crypto";
 
 const prisma = new PrismaClient();
 
@@ -52,23 +53,29 @@ const ADMIN_EMAIL = "nbhson43@gmail.com";
 
 async function main() {
   console.log("Seeding...");
-  // KHÔNG hardcode password vào repo. Yêu cầu qua env; thiếu → abort thay vì
-  // tạo admin với password công khai.
-  const demoPassword = process.env.SEED_DEMO_PASSWORD;
-  if (!demoPassword || demoPassword.length < 12) {
-    throw new Error("Set SEED_DEMO_PASSWORD (>= 12 chars) before seeding");
-  }
-  const demoPasswordHash = await bcrypt.hash(demoPassword, 10);
+  // Admin: mật khẩu random (crypto.randomBytes) khi tạo mới hoặc khi user chưa
+  // có password — in ra console ĐÚNG MỘT LẦN kèm cảnh báo đổi ngay, không
+  // hardcode vào repo.
+  let adminPasswordShown = "";
   // Ensure primary admin exists
   {
     let admin = await prisma.user.findUnique({ where: { email: ADMIN_EMAIL } });
-    if (!admin) {
-      admin = await prisma.user.create({
-        data: { email: ADMIN_EMAIL, name: "nbhson", passwordHash: demoPasswordHash, status: "ACTIVE", isAdmin: true, lastActiveAt: new Date() },
-      });
-      console.log(`Created admin ${ADMIN_EMAIL} (nbhson)`);
-    } else if (!admin.isAdmin || !admin.passwordHash || admin.name !== "nbhson") {
-      admin = await prisma.user.update({ where: { id: admin.id }, data: { isAdmin: true, name: "nbhson", passwordHash: admin.passwordHash ?? demoPasswordHash, status: "ACTIVE" } });
+    if (!admin || !admin.passwordHash) {
+      const adminPassword = crypto.randomBytes(16).toString("base64url"); // ~22 ký tự
+      const adminPasswordHash = await bcrypt.hash(adminPassword, 10);
+      if (!admin) {
+        admin = await prisma.user.create({
+          data: { email: ADMIN_EMAIL, name: "nbhson", passwordHash: adminPasswordHash, status: "ACTIVE", isAdmin: true, lastActiveAt: new Date() },
+        });
+        console.log(`Created admin ${ADMIN_EMAIL} (nbhson)`);
+      } else {
+        admin = await prisma.user.update({ where: { id: admin.id }, data: { isAdmin: true, name: "nbhson", passwordHash: adminPasswordHash, status: "ACTIVE" } });
+        console.log(`Promoted ${ADMIN_EMAIL} to admin (nbhson)`);
+      }
+      adminPasswordShown = adminPassword;
+      console.log(`\n⚠️  Mật khẩu admin ${ADMIN_EMAIL} (random, chỉ hiện MỘT lần — ĐỔI NGAY sau khi đăng nhập): ${adminPassword}\n`);
+    } else if (!admin.isAdmin || admin.name !== "nbhson") {
+      admin = await prisma.user.update({ where: { id: admin.id }, data: { isAdmin: true, name: "nbhson", status: "ACTIVE" } });
       console.log(`Promoted ${ADMIN_EMAIL} to admin (nbhson)`);
     }
     // ensure profile exists for admin so discover doesn't break
@@ -88,6 +95,13 @@ async function main() {
   }
   // Demo users chỉ tạo khi SEED_DEMO=1 — mặc định giữ DB sạch, chỉ user đăng ký thật mới hiện ở Bưu thiếp
   if (process.env.SEED_DEMO === "1") {
+    // Demo users cần mật khẩu chung qua env (≥ 12 ký tự); thiếu → abort thay vì
+    // tạo user với password công khai.
+    const demoPassword = process.env.SEED_DEMO_PASSWORD;
+    if (!demoPassword || demoPassword.length < 12) {
+      throw new Error("Set SEED_DEMO_PASSWORD (>= 12 chars) before seeding demo users (SEED_DEMO=1)");
+    }
+    const demoPasswordHash = await bcrypt.hash(demoPassword, 10);
   for (let i=0; i<35; i++) {
     const [baseName, gender] = firstNames[i % firstNames.length];
     const name = i < firstNames.length ? baseName : `${baseName}${i}`;
@@ -192,7 +206,7 @@ async function main() {
     }
   }
 
-  console.log("Seed done. Admin: " + ADMIN_EMAIL + " / Lumen123! " + (process.env.SEED_DEMO === "1" ? "+ demo1@lumen.app" : "SEED_DEMO!=1 nên không tạo demo users — chỉ giữ user đăng ký thật"));
+  console.log("Seed done. Admin: " + ADMIN_EMAIL + (adminPasswordShown ? " (mật khẩu random đã in ở trên — ĐỔI NGAY)" : " (giữ mật khẩu hiện có)") + " " + (process.env.SEED_DEMO === "1" ? "+ demo1@lumen.app" : "SEED_DEMO!=1 nên không tạo demo users — chỉ giữ user đăng ký thật"));
 }
 
 main().then(()=>process.exit(0)).catch(e=>{console.error(e); process.exit(1)});
