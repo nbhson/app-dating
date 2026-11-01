@@ -9,7 +9,6 @@ import bcrypt from "bcryptjs";
 export const ADMIN_EMAIL = (process.env.ADMIN_EMAIL ?? "").toLowerCase().trim() || null; // set via env, never hardcode
 export const ADMIN_NAME = "admin";
 const LEGACY_ADMIN_EMAIL = "admin@admin.admin";
-const ADMIN_EMAILS = new Set(ADMIN_EMAIL ? [ADMIN_EMAIL] : []);
 
 // --- Login rate limiting (per email, storage-abstracted) ---
 // Mitigates brute-force password guessing. Backend is selectable via
@@ -29,9 +28,6 @@ async function clearLoginRateLimit(key: string): Promise<void> {
   await getRateLimitStore().reset(key);
 }
 
-function isAdminEmail(email: string | null | undefined): boolean {
-  return !!email && ADMIN_EMAILS.has(email.toLowerCase().trim());
-}
 function isLegacyAdminEmail(email: string | null | undefined): boolean {
   return email?.toLowerCase().trim() === LEGACY_ADMIN_EMAIL;
 }

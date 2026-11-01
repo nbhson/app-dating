@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useI18n } from "@/lib/i18n/context";
 
 export default function Deletion() {
-  const { t, locale } = useI18n();
+  const { locale } = useI18n();
   const isVi = locale === "vi";
   return (
     <div className="h-[100dvh] overflow-y-auto overscroll-contain bg-[#FFFCFA] no-scrollbar">

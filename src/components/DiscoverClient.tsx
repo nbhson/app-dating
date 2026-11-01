@@ -28,7 +28,7 @@ type Profile = {
 
 export default function DiscoverClient() {
   const { t, trans, locale } = useI18n();
-  const { toast, confirm, showAlert } = usePopup();
+  const { toast, confirm } = usePopup();
   const intentLabel = t.intent as Record<string, string>;
   const [profile, setProfile] = useState<Profile | null>(null);
   const [usage, setUsage] = useState<{ viewed: number; limit: number; remaining: number } | null>(null);
@@ -114,7 +114,7 @@ export default function DiscoverClient() {
       setUsage(data.usage);
       if (data.dailyQuestion) setDailyQ(data.dailyQuestion);
       setPhotoIdx(0);
-    } catch (e) {
+    } catch {
       setError("UNKNOWN");
     } finally {
       setLoading(false);

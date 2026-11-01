@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import { prisma } from "../src/lib/prisma";
 import { DAILY_LIMIT } from "../src/lib/daily";
 import { todayKey } from "../src/lib/utils";

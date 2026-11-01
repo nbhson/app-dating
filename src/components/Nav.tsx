@@ -10,7 +10,7 @@ import { usePopup } from "@/components/ui/PopupProvider";
 export default function Nav() {
   const pathname = usePathname();
   const { t, trans } = useI18n();
-  const { showAlert, toast } = usePopup();
+  const { showAlert } = usePopup();
   const [isAdmin, setIsAdmin] = useState(false);
   const items = useMemo(() => [
     { href: "/discover", label: t.nav.discover, sub: t.nav.discoverSub, icon: "♥", activeIcon: "♥" },

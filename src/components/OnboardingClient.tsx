@@ -27,7 +27,7 @@ const intents = [
 
 export default function OnboardingClient({ initial }: Props) {
   const router = useRouter();
-  const { t, trans } = useI18n();
+  const { trans } = useI18n();
   const { toast } = usePopup();
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({

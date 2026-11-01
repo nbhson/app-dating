@@ -6,7 +6,7 @@ import { usePopup } from "@/components/ui/PopupProvider";
 import { computeProfileCompleteness } from "@/lib/completeness";
 
 export default function ProfileClient({ user }: { user: any }) {
-  const { t, trans, locale } = useI18n();
+  const { t, trans } = useI18n();
   const { toast, confirm, prompt } = usePopup();
   const promptQs = (t.profile.promptQuestions as unknown as string[]) ?? [];
   // Round 2 feature: completeness dùng đúng công thức server (lib/completeness).
@@ -54,7 +54,7 @@ export default function ProfileClient({ user }: { user: any }) {
     drinking: (user as any).drinking ?? "",
   });
   const [isIncognito, setIsIncognito] = useState((user as any).isIncognito ?? false);
-  const [stamps, setStamps] = useState((user as any).stamps ?? 3);
+  const [stamps] = useState((user as any).stamps ?? 3);
   const [verifyStatus, setVerifyStatus] = useState((user as any).verificationStatus ?? "NONE");
   const isVerified = (user as any).isVerified ?? false;
   const isAdmin = (user as any).isAdmin ?? false;

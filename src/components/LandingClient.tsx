@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import { useI18n } from "@/lib/i18n/context";
 
 export default function LandingClient() {
-  const { t, trans } = useI18n();
+  const { t } = useI18n();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
